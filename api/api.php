@@ -1,209 +1,184 @@
 <?php
-require_once '../config/conexao.php';
+header('Content-Type: application/json; charset=utf-8');
 
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Access-Control-Allow-Headers, Authorization, X-Requested-With");
+// 1. CONEXÃO À BASE DE DADOS
+$host = "localhost";
+$db   = "grafica_db";
+$user = "root";
+$pass = "";
+$charset = "utf8mb4";
 
-$acao = $_GET['acao'] ?? '';
+$dsn = "mysql:host=$host;dbname=$db;charset=$charset";
+$opcoes = [
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
+];
 
-// --- MÉTODOS GET ---
-if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-    
-    if ($acao === 'listar_estrutura') {
-        try {
-            $stmtCat = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
-            $categorias = $stmtCat->fetchAll();
-            
-            foreach ($categorias as &$cat) {
-                $stmtSub = $pdo->prepare("SELECT * FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
-                $stmtSub->execute([$cat['id']]);
-                $cat['subcategorias'] = $stmtSub->fetchAll();
-            }
-            echo json_encode($categorias);
-        } catch (Exception $e) {
-            echo json_encode(['status' => 'erro', 'msg' => $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($acao === 'produtos') {
-        $subcategoria_id = $_GET['subcategoria_id'] ?? 0;
-        try {
-            $stmtProd = $pdo->prepare("SELECT * FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
-            $stmtProd->execute([$subcategoria_id]);
-            $produtos = $stmtProd->fetchAll();
-
-            foreach ($produtos as &$prod) {
-                if ($prod['tipo_preco'] === 'variavel') {
-                    $stmtVar = $pdo->prepare("SELECT id, tamanho, tipo_impressao, quantidade, acabamento, preco FROM produto_variantes WHERE produto_id = ?");
-                    $stmtVar->execute([$prod['id']]);
-                    $prod['variantes'] = $stmtVar->fetchAll();
-                }
-            }
-            echo json_encode($produtos);
-        } catch (Exception $e) {
-            echo json_encode(['status' => 'erro', 'msg' => $e->getMessage()]);
-        }
-        exit;
-    }
-
-    if ($acao === 'calcular_preco') {
-        $produto_id = $_GET['produto_id'] ?? 0;
-        $tamanho = $_GET['tamanho'] ?? null;
-        $tipo_impressao = $_GET['tipo_impressao'] ?? null;
-        $quantidade = $_GET['quantidade'] ?? null;
-        $acabamento = $_GET['acabamento'] ?? null;
-
-        try {
-            $sql = "SELECT preco FROM produto_variantes WHERE produto_id = :prod_id";
-            $params = [':prod_id' => $produto_id];
-
-            $sql .= $tamanho ? " AND tamanho = :tamanho" : " AND tamanho IS NULL";
-            if($tamanho) $params[':tamanho'] = $tamanho;
-
-            $sql .= $tipo_impressao ? " AND tipo_impressao = :tipo" : " AND tipo_impressao IS NULL";
-            if($tipo_impressao) $params[':tipo'] = $tipo_impressao;
-
-            $sql .= $quantidade ? " AND quantidade = :qtd" : " AND quantidade IS NULL";
-            if($quantidade) $params[':qtd'] = $quantidade;
-
-            $sql .= $acabamento ? " AND acabamento = :acab" : " AND acabamento IS NULL";
-            if($acabamento) $params[':acab'] = $acabamento;
-
-            $stmt = $pdo->prepare($sql);
-            $stmt->execute($params);
-            $res = $stmt->fetch();
-
-            if ($res) {
-                echo json_encode(['status' => 'sucesso', 'preco' => $res['preco']]);
-            } else {
-                echo json_encode(['status' => 'indisponivel', 'msg' => 'Combinação indisponível']);
-            }
-        } catch (Exception $e) {
-            echo json_encode(['status' => 'erro', 'msg' => $e->getMessage()]);
-        }
-        exit;
-    }
+try {
+    $pdo = new PDO($dsn, $user, $pass, $opcoes);
+} catch (\PDOException $e) {
+    echo json_encode(["erro" => "Falha na conexão: " . $e->getMessage()]);
+    exit;
 }
 
-// --- MÉTODOS POST (CRUD Dinâmico) ---
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// 2. ROTAS DA API
+$acao = $_GET['acao'] ?? '';
+
+switch ($acao) {
     
-    if ($acao === 'guardar_categoria') {
-        $id = $_POST['id'] ?? null;
+    case 'listar_estrutura':
+        $stmt = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+        $categorias = $stmt->fetchAll();
+        
+        foreach ($categorias as &$cat) {
+            $stmtSub = $pdo->prepare("SELECT * FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
+            $stmtSub->execute([$cat['id']]);
+            $cat['subcategorias'] = $stmtSub->fetchAll();
+        }
+        echo json_encode($categorias);
+        break;
+
+    case 'produtos':
+        $subcategoria_id = $_GET['subcategoria_id'] ?? 0;
+        $stmt = $pdo->prepare("SELECT * FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
+        $stmt->execute([$subcategoria_id]);
+        $produtos = $stmt->fetchAll();
+
+        foreach ($produtos as &$prod) {
+            $stmtVar = $pdo->prepare("SELECT * FROM produto_variantes WHERE produto_id = ?");
+            $stmtVar->execute([$prod['id']]);
+            $variantes = $stmtVar->fetchAll();
+
+            foreach ($variantes as &$v) {
+                if (!empty($v['atributos_json'])) {
+                    $atributos = json_decode($v['atributos_json'], true);
+                    if (is_array($atributos)) {
+                        foreach ($atributos as $chave => $valor) {
+                            $v[$chave] = $valor;
+                        }
+                    }
+                }
+            }
+            $prod['variantes'] = $variantes;
+        }
+        echo json_encode($produtos);
+        break;
+
+    case 'guardar_categoria':
+        $id = $_POST['id'] ?? '';
         $nome = $_POST['nome'] ?? '';
         
-        if (empty($nome)) { echo json_encode(['status'=>'erro','msg'=>'Nome obrigatório']); exit; }
-        
-        if ($id) {
-            $stmt = $pdo->prepare("UPDATE categorias SET nome = ? WHERE id = ?");
-            $stmt->execute([$nome, $id]);
-        } else {
+        if (empty($id) || $id === 'null' || $id === 'undefined') {
+            // Nova Categoria
             $stmt = $pdo->prepare("INSERT INTO categorias (nome) VALUES (?)");
             $stmt->execute([$nome]);
+        } else {
+            // Editar Categoria Existente
+            $stmt = $pdo->prepare("UPDATE categorias SET nome = ? WHERE id = ?");
+            $stmt->execute([$nome, $id]);
         }
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true]);
+        break;
 
-    if ($acao === 'eliminar_categoria') {
-        $id = $_POST['id'] ?? null;
+    case 'eliminar_categoria':
+        $id = $_POST['id'] ?? '';
         $stmt = $pdo->prepare("DELETE FROM categorias WHERE id = ?");
         $stmt->execute([$id]);
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true]);
+        break;
 
-    if ($acao === 'guardar_subcategoria') {
-        $id = $_POST['id'] ?? null;
-        $categoria_id = $_POST['categoria_id'] ?? null;
+    case 'guardar_subcategoria':
+        $id = $_POST['id'] ?? '';
+        $categoria_id = $_POST['categoria_id'] ?? '';
         $nome = $_POST['nome'] ?? '';
         
-        if ($id) {
-            $stmt = $pdo->prepare("UPDATE subcategorias SET nome = ? WHERE id = ?");
-            $stmt->execute([$nome, $id]);
-        } else {
+        if (empty($id) || $id === 'null' || $id === 'undefined') {
+            // Nova Subcategoria
             $stmt = $pdo->prepare("INSERT INTO subcategorias (categoria_id, nome) VALUES (?, ?)");
             $stmt->execute([$categoria_id, $nome]);
+        } else {
+            // Editar Subcategoria Existente
+            $stmt = $pdo->prepare("UPDATE subcategorias SET nome = ?, categoria_id = ? WHERE id = ?");
+            $stmt->execute([$nome, $categoria_id, $id]);
         }
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true]);
+        break;
 
-    if ($acao === 'eliminar_subcategoria') {
-        $id = $_POST['id'] ?? null;
+    case 'eliminar_subcategoria':
+        $id = $_POST['id'] ?? '';
         $stmt = $pdo->prepare("DELETE FROM subcategorias WHERE id = ?");
         $stmt->execute([$id]);
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true]);
+        break;
 
-    if ($acao === 'guardar_produto') {
-        $id = $_POST['id'] ?? null;
-        $subcategoria_id = $_POST['subcategoria_id'] ?? null;
+    case 'guardar_produto':
+        $id = $_POST['id'] ?? '';
+        $subcategoria_id = $_POST['subcategoria_id'] ?? '';
         $nome = $_POST['nome'] ?? '';
         $tipo_preco = $_POST['tipo_preco'] ?? 'fixo';
-        $preco_fixo = $_POST['preco_fixo'] ?? null;
-        
-        // Upload de Imagem Simples
+        $preco_fixo = !empty($_POST['preco_fixo']) ? $_POST['preco_fixo'] : null;
         $imagem_url = $_POST['imagem_url_atual'] ?? '';
+
+        // Tratamento do Upload da Imagem
         if (isset($_FILES['imagem']) && $_FILES['imagem']['error'] === UPLOAD_ERR_OK) {
             $ext = pathinfo($_FILES['imagem']['name'], PATHINFO_EXTENSION);
-            $nome_foto = time() . '_' . uniqid() . '.' . $ext;
-            $destino = '../uploads/' . $nome_foto;
-            if (move_uploaded_file($_FILES['imagem']['tmp_name'], $destino)) {
-                $imagem_url = 'uploads/' . $nome_foto;
+            $nomeFicheiro = uniqid('prod_', true) . '.' . $ext;
+            
+            if (!is_dir('../uploads')) {
+                mkdir('../uploads', 0777, true);
+            }
+            
+            if (move_uploaded_file($_FILES['imagem']['tmp_name'], '../uploads/' . $nomeFicheiro)) {
+                $imagem_url = 'uploads/' . $nomeFicheiro;
             }
         }
 
-        if ($tipo_preco === 'fixo') {
-            $preco_fixo = !empty($preco_fixo) ? str_replace(',', '.', $preco_fixo) : 0;
-        } else {
-            $preco_fixo = null;
-        }
-
-        if ($id) {
-            $stmt = $pdo->prepare("UPDATE produtos SET nome = ?, imagem_url = ?, tipo_preco = ?, preco_fixo = ? WHERE id = ?");
-            $stmt->execute([$nome, $imagem_url, $tipo_preco, $preco_fixo, $id]);
-            $produto_id = $id;
-        } else {
+        // Salvar dados do Produto Principal
+        if (empty($id) || $id === 'null' || $id === 'undefined') {
             $stmt = $pdo->prepare("INSERT INTO produtos (subcategoria_id, nome, imagem_url, tipo_preco, preco_fixo) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$subcategoria_id, $nome, $imagem_url, $tipo_preco, $preco_fixo]);
-            $produto_id = $pdo->lastInsertId();
+            $id = $pdo->lastInsertId();
+        } else {
+            $stmt = $pdo->prepare("UPDATE produtos SET subcategoria_id = ?, nome = ?, imagem_url = ?, tipo_preco = ?, preco_fixo = ? WHERE id = ?");
+            $stmt->execute([$subcategoria_id, $nome, $imagem_url, $tipo_preco, $preco_fixo, $id]);
         }
 
-        // Se for variável, processa a matriz de variantes passadas em JSON
-        if ($tipo_preco === 'variavel' && isset($_POST['variantes'])) {
-            // Limpa variantes antigas primeiro
-            $stmtDel = $pdo->prepare("DELETE FROM produto_variantes WHERE produto_id = ?");
-            $stmtDel->execute([$produto_id]);
+        // CORRIGIDO: Elimina as variantes antigas de forma segura usando o $id correto
+        $stmtDel = $pdo->prepare("DELETE FROM produto_variantes WHERE produto_id = ?");
+        $stmtDel->execute([$id]);
 
+        // Se o preço for variável, grava a nova matriz combinatória
+        if ($tipo_preco === 'variavel' && !empty($_POST['variantes'])) {
             $variantes = json_decode($_POST['variantes'], true);
+            
             if (is_array($variantes)) {
-                $stmtIns = $pdo->prepare("INSERT INTO produto_variantes (produto_id, tamanho, tipo_impressao, quantidade, acabamento, preco) VALUES (?, ?, ?, ?, ?, ?)");
                 foreach ($variantes as $v) {
-                    $tamanho = !empty($v['tamanho']) ? $v['tamanho'] : null;
-                    $tipo_imp = !empty($v['tipo_impressao']) ? $v['tipo_impressao'] : null;
-                    $qtd = !empty($v['quantidade']) ? $v['quantidade'] : null;
-                    $acab = !empty($v['acabamento']) ? $v['acabamento'] : null;
-                    $preco_var = str_replace(',', '.', $v['preco']);
+                    $precoVar = $v['preco'] ?? 0;
                     
-                    $stmtIns->execute([$produto_id, $tamanho, $tipo_imp, $qtd, $acab, $preco_var]);
+                    // CORRIGIDO: Variável unificada sem espaços
+                    $atributos_originais = $v; 
+                    unset($atributos_originais['preco']);
+                    
+                    $atributos_json = json_encode($atributos_originais, JSON_UNESCAPED_UNICODE);
+
+                    $stmtInsVar = $pdo->prepare("INSERT INTO produto_variantes (produto_id, preco, atributos_json) VALUES (?, ?, ?)");
+                    $stmtInsVar->execute([$id, $precoVar, $atributos_json]);
                 }
             }
         }
 
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true, "produto_id" => $id]);
+        break;
 
-    if ($acao === 'eliminar_produto') {
-        $id = $_POST['id'] ?? null;
+    case 'eliminar_produto':
+        $id = $_POST['id'] ?? '';
         $stmt = $pdo->prepare("DELETE FROM produtos WHERE id = ?");
         $stmt->execute([$id]);
-        echo json_encode(['status' => 'sucesso']);
-        exit;
-    }
+        echo json_encode(["sucesso" => true]);
+        break;
+
+    default:
+        echo json_encode(["erro" => "Ação não encontrada"]);
+        break;
 }

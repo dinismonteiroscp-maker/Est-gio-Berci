@@ -1,126 +1,173 @@
+// =========================================================================
+// 1. INICIALIZAÇÃO DE ESTADOS E ACORDÃO DO CLIENTE
+// =========================================================================
+window.todasAsVariantes = {}; 
+
 document.addEventListener("DOMContentLoaded", () => {
-    carregarEstrutura();
+    carregarEstruturaCliente();
 });
 
-async function carregarEstrutura() {
-    const res = await fetch('api/api.php?acao=listar_estrutura');
-    const categorias = await res.json();
-    
-    const menu = document.getElementById("menu-categorias");
-    menu.innerHTML = "";
-
-    categorias.forEach(cat => {
-        const item = document.createElement("div");
-        item.className = "accordion-item";
+// Carrega o menu lateral esquerdo do cliente
+async function carregarEstruturaCliente() {
+    try {
+        const res = await fetch('api/api.php?acao=listar_estrutura');
+        if (!res.ok) throw new Error("Erro de rede ao ligar à API.");
         
-        let subHtml = "";
-        cat.subcategorias.forEach(sub => {
-            subHtml += `<button class="subcat-btn" onclick="carregarProdutos(${sub.id}, this)">${sub.nome}</button>`;
+        const estrutura = await res.json();
+        // Correção do ID: index.html usa "menu-categorias"
+        const menu = document.getElementById("menu-categorias"); 
+        if (!menu) return;
+
+        menu.innerHTML = ""; 
+
+        estrutura.forEach(cat => {
+            const div = document.createElement("div");
+            div.className = "accordion-item";
+            
+            let subsHtml = "";
+            if (cat.subcategorias && Array.isArray(cat.subcategorias)) {
+                cat.subcategorias.forEach(sub => {
+                    subsHtml += `
+                        <div class="subcat-container">
+                            <button class="subcat-btn" onclick="carregarProdutosCliente(${sub.id})">${sub.nome}</button>
+                        </div>
+                    `;
+                });
+            }
+
+            div.innerHTML = `
+                <div style="padding: 6px 10px; margin-top:0.2rem;">
+                    <button class="accordion-header" style="background:none; border:none; outline:none; font-weight:700; width:100%; text-align:left;">
+                        ${cat.nome}
+                    </button>
+                </div>
+                <div class="accordion-content open" style="padding-left:0.5rem; margin-top: 0.4rem;">
+                    ${subsHtml}
+                </div>
+            `;
+            menu.appendChild(div);
         });
-
-        item.innerHTML = `
-            <button class="accordion-header" onclick="toggleAccordion(this)">
-                ${cat.nome} <span>↓</span>
-            </button>
-            <div class="accordion-content">
-                ${subHtml || '<p style="padding:0.5rem 1rem; font-size:0.8rem; color:#ccc;">Vazio</p>'}
-            </div>
-        `;
-        menu.appendChild(item);
-    });
+    } catch (error) {
+        console.error("Erro ao carregar o menu do cliente:", error);
+    }
 }
 
-function toggleAccordion(btn) {
-    const content = btn.nextElementSibling;
-    content.classList.toggle("open");
+// =========================================================================
+// 2. CARREGAR PRODUTOS DA API (CLIENTE)
+// =========================================================================
+async function carregarProdutosCliente(subcatId) {
+    try {
+        const res = await fetch(`api/api.php?acao=produtos&subcategoria_id=${subcatId}`);
+        if (!res.ok) throw new Error("Erro ao puxar produtos.");
+        
+        const produtos = await res.json();
+        renderizarProdutosNaGrelha(produtos);
+    } catch (error) {
+        console.error("Erro ao carregar os produtos do cliente:", error);
+    }
 }
 
-async function carregarProdutos(subcatId, btn) {
-    document.querySelectorAll(".subcat-btn").forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-
-    const res = await fetch(`api/api.php?acao=produtos&subcategoria_id=${subcatId}`);
-    const produtos = await res.json();
-    
-    const grid = document.getElementById("grid-produtos");
+// =========================================================================
+// 3. INJETAR OS CARTÕES DE PRODUTOS NO HTML COM OS DROPDOWNS DINÂMICOS
+// =========================================================================
+function renderizarProdutosNaGrelha(produtos) {
+    const grid = document.getElementById("grelha-produtos");
+    if (!grid) return;
     grid.innerHTML = "";
 
-    if(produtos.length === 0) {
-        grid.innerHTML = `<p style="color: var(--text-muted);">Nenhum produto nesta categoria.</p>`;
+    if (!produtos || produtos.length === 0) {
+        grid.innerHTML = "<p class='mensagem-inicial'>Nenhum produto disponível de momento.</p>";
         return;
     }
 
     produtos.forEach(prod => {
         const card = document.createElement("div");
         card.className = "card-produto";
-        
-        let imgTag = prod.imagem_url ? `<img src="${prod.imagem_url}" alt="${prod.nome}">` : `<img src="https://via.placeholder.com/260x180?text=Sem+Imagem" alt="Placeholder">`;
-        
-        let dynamicControls = "";
-        let precoInicial = "";
 
-        if (prod.tipo_preco === 'fixo') {
-            precoInicial = `${prod.preco_fixo} €`;
-        } else {
-            precoInicial = "Selecione as opções...";
+        let imgUrl = prod.imagem_url ? prod.imagem_url : "https://via.placeholder.com/260x180?text=Sem+Imagem";
+        
+        let seccaoOpcoes = "";
+        if (prod.tipo_preco === 'variavel' && prod.variantes && prod.variantes.length > 0) {
+            seccaoOpcoes = `<div class="opcoes-container" data-prodid="${prod.id}">`;
             
-            // Mapear e extrair fatores únicos existentes nas variantes
-            const fatores = { tamanho: new Set(), tipo_impressao: new Set(), quantidade: new Set(), acabamento: new Set() };
+            let atributosMapeados = {};
             prod.variantes.forEach(v => {
-                if(v.tamanho) fatores.tamanho.add(v.tamanho);
-                if(v.tipo_impressao) fatores.tipo_impressao.add(v.tipo_impressao);
-                if(v.quantidade) fatores.quantidade.add(v.quantidade);
-                if(v.acabamento) fatores.acabamento.add(v.acabamento);
+                Object.keys(v).forEach(chave => {
+                    if (chave !== 'id' && chave !== 'produto_id' && chave !== 'preco' && chave !== 'atributos_json' && v[chave]) {
+                        if (!atributosMapeados[chave]) atributosMapeados[chave] = [];
+                        if (!atributosMapeados[chave].includes(v[chave])) {
+                            atributosMapeados[chave].push(v[chave]);
+                        }
+                    }
+                });
             });
 
-            // Criar os selects dinamicamente apenas para fatores ativos
-            Object.keys(fatores).forEach(fator => {
-                if (fatores[fator].size > 0) {
-                    let labelFormatado = fator.replace('_', ' ');
-                    dynamicControls += `<div class="select-grupo">
-                        <label>${labelFormatado}</label>
-                        <select class="fator-select" data-fator="${fator}" data-prod="${prod.id}" onchange="atualizarPrecoDinamico(${prod.id})">
-                            <option value="">Escolha...</option>`;
-                    fatores[fator].forEach(val => {
-                        dynamicControls += `<option value="${val}">${val}</option>`;
-                    });
-                    dynamicControls += `</select></div>`;
-                }
-            });
+            if (Object.keys(atributosMapeados).length > 0) {
+                Object.keys(atributosMapeados).forEach(fator => {
+                    let labelFormatado = fator.replace(/_/g, ' ');
+                    seccaoOpcoes += `
+                        <div class="fator-grupo" style="margin-bottom: 0.5rem;">
+                            <label style="font-size:0.8rem; font-weight:600; text-transform:capitalize; display:block; margin-bottom:2px;">${labelFormatado}:</label>
+                            <select class="select-opcao-publica" data-fator="${fator}" onchange="recalcularPrecoPublico(${prod.id})" style="width:100%; padding:4px; border-radius:4px; border:1px solid #cbd5e1;">
+                                ${atributosMapeados[fator].map(op => `<option value="${op}">${op}</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                });
+            }
+            seccaoOpcoes += `</div>`;
+        } else {
+            seccaoOpcoes = `<div class="opcoes-container"></div>`;
         }
 
         card.innerHTML = `
-            ${imgTag}
+            <img src="${imgUrl}" alt="${prod.nome}">
             <h3>${prod.nome}</h3>
-            <div class="configurador">${dynamicControls}</div>
-            <div class="preco-tag" id="preco-p-${prod.id}">${precoInicial}</div>
+            ${seccaoOpcoes}
+            <div class="preco-tag" id="preco-prod-${prod.id}">
+                ${prod.tipo_preco === 'fixo' ? parseFloat(prod.preco_fixo).toFixed(2) + ' €' : 'A calcular...'}
+            </div>
         `;
         grid.appendChild(card);
+
+        if (prod.tipo_preco === 'variavel' && prod.variantes && prod.variantes.length > 0) {
+            window.todasAsVariantes[prod.id] = prod.variantes;
+            recalcularPrecoPublico(prod.id);
+        }
     });
 }
 
-async function atualizarPrecoDinamico(prodId) {
-    const selects = document.querySelectorAll(`.fator-select[data-prod="${prodId}"]`);
-    let query = `api/api.php?acao=calcular_preco&produto_id=${prodId}`;
-    
-    let completo = true;
+// =========================================================================
+// 4. CÁLCULO DE PREÇO COM COMBINAÇÃO DINÂMICA (MATRIZ)
+// =========================================================================
+function recalcularPrecoPublico(produtoId) {
+    const variantes = window.todasAsVariantes[produtoId];
+    const precoTag = document.getElementById(`preco-prod-${produtoId}`);
+    if (!variantes || !precoTag) return;
+
+    const container = document.querySelector(`.opcoes-container[data-prodid="${produtoId}"]`);
+    if (!container) return;
+
+    const selects = container.querySelectorAll('.select-opcao-publica');
+    let selecaoAtual = {};
+
     selects.forEach(sel => {
-        if (!sel.value) completo = false;
-        query += `&${sel.dataset.fator}=${encodeURIComponent(sel.value)}`;
+        selecaoAtual[sel.dataset.fator] = sel.value;
     });
 
-    const precoTag = document.getElementById(`preco-p-${prodId}`);
-    if (!completo) {
-        precoTag.innerText = "Selecione as opções...";
-        return;
-    }
+    let varianteCorrespondente = variantes.find(v => {
+        let condicao = true;
+        Object.keys(selecaoAtual).forEach(fator => {
+            if (v[fator] !== selecaoAtual[fator]) {
+                condicao = false;
+            }
+        });
+        return condicao;
+    });
 
-    const res = await fetch(query);
-    const dados = await res.json();
-
-    if (dados.status === 'sucesso') {
-        precoTag.innerText = `${dados.preco} €`;
+    if (varianteCorrespondente) {
+        precoTag.innerText = parseFloat(varianteCorrespondente.preco).toFixed(2) + " €";
     } else {
-        precoTag.innerText = "Indisponível";
+        precoTag.innerText = "Sob Consulta";
     }
 }

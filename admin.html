@@ -3,68 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Berci - Modo Edição </title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="shortcut icon" href="www.berci.pt-favicon.ico" type="image/x-icon">
+    <title>Berci - Painel de Administração</title>
+    <link rel="stylesheet" href="assets/css/style.css?v=5">
+    <style>
+        .modal { 
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background: rgba(15, 23, 42, 0.6); 
+            backdrop-filter: blur(4px);
+            justify-content: center; 
+            align-items: center; 
+            z-index: 9999; 
+        }
+        .modal.open { 
+            display: flex; 
+        }
+        .modal-content { 
+            background: #ffffff; 
+            padding: 2rem; 
+            border-radius: 12px; 
+            width: 90%; 
+            max-width: 600px; 
+            max-height: 90vh; 
+            overflow-y: auto; 
+            position: relative;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .close-modal { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            font-size: 1.2rem; 
+            cursor: pointer; 
+            background: #f1f5f9; 
+            border: none; 
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+        }
+        .close-modal:hover {
+            background: #e2e8f0;
+            color: #0f172a;
+        }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 0.4rem; font-size: 0.9rem; }
+        .form-control { width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.95rem; }
+        .btn { padding: 8px 16px; border-radius: 6px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-primary:hover { background: #1d4ed8; }
+        .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+        .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
+    </style>
 </head>
 <body>
 
     <header>
-        <h1>Painel de Gestão (Modo Edição)</h1>
-        <a href="index.html">← Ver Inicio</a>
+        <div class="logo">Berci - Administração</div>
+        <div>
+            <a href="index.html" class="btn-modo" style="text-decoration: none; color: #475569; font-weight: 500; font-size: 0.9rem;">Sair do Admin →</a>
+        </div>
     </header>
 
-    <div class="layout-split">
-        <aside>
-            <button class="btn-dashed" onclick="abrirModalCategoria()">+ Adicionar Categoria</button>
-            <div id="menu-admin"></div>
+    <div class="main-container">
+        <aside class="sidebar" id="menu-admin">
+            <button class="btn btn-primary" onclick="abrirModalCategoria()" style="width: 100%; margin-bottom: 1.5rem; display: block;">
+                + Nova Categoria
+            </button>
         </aside>
 
-        <main>
-            <div class="grid-produtos" id="grid-produtos-admin">
-                <p style="color: var(--text-muted);">Selecione uma subcategoria para gerir os produtos.</p>
+        <main class="conteudo">
+            <div id="grid-produtos-admin" class="produtos-grid">
+                <p class="mensagem-inicial">Selecione uma subcategoria no menu lateral para visualizar e gerir os produtos.</p>
             </div>
         </main>
     </div>
 
-    <div class="modal" id="modal-categoria">
+    <div id="modal-categoria" class="modal">
         <div class="modal-content">
-            <h2 id="modal-cat-titulo">Nova Categoria</h2>
+            <button class="close-modal" onclick="fecharModais()">✕</button>
+            <h2 id="modal-cat-titulo" style="margin-bottom: 1.5rem; font-size: 1.3rem;">Nova Categoria</h2>
             <form id="form-categoria" onsubmit="guardarCategoria(event)">
                 <input type="hidden" id="cat-id">
                 <div class="form-group">
                     <label>Nome da Categoria</label>
-                    <input type="text" id="cat-nome" required>
+                    <input type="text" id="cat-nome" class="form-control" required placeholder="Ex: Cartões de Visita">
                 </div>
-                <div class="flex-end">
-                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
+                <button type="submit" class="btn btn-primary">Guardar Categoria</button>
             </form>
         </div>
     </div>
 
-    <div class="modal" id="modal-subcategoria">
+    <div id="modal-subcategoria" class="modal">
         <div class="modal-content">
-            <h2>Nova Subcategoria</h2>
+            <button class="close-modal" onclick="fecharModais()">✕</button>
+            <h2 id="modal-subcat-titulo" style="margin-bottom: 1.5rem; font-size: 1.3rem;">Nova Subcategoria</h2>
             <form id="form-subcategoria" onsubmit="guardarSubcategoria(event)">
                 <input type="hidden" id="subcat-id">
                 <input type="hidden" id="subcat-cat-id">
                 <div class="form-group">
                     <label>Nome da Subcategoria</label>
-                    <input type="text" id="subcat-nome" required>
+                    <input type="text" id="subcat-nome" class="form-control" required placeholder="Ex: Premium">
                 </div>
-                <div class="flex-end">
-                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button> 
-                </div>
+                <button type="submit" class="btn btn-primary">Guardar Subcategoria</button>
             </form>
         </div>
     </div>
 
-    <div class="modal" id="modal-produto" style="max-width:600px;">
-        <div class="modal-content" style="max-width: 600px;">
-            <h2>Gerir Produto</h2>
+    <div id="modal-produto" class="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="fecharModais()">✕</button>
+            <h2 id="modal-prod-titulo" style="margin-bottom: 1.5rem; font-size: 1.3rem;">Novo Produto</h2>
             <form id="form-produto" onsubmit="guardarProduto(event)">
                 <input type="hidden" id="prod-id">
                 <input type="hidden" id="prod-subcat-id">
@@ -72,39 +128,48 @@
 
                 <div class="form-group">
                     <label>Nome do Produto</label>
-                    <input type="text" id="prod-nome" required>
+                    <input type="text" id="prod-nome" class="form-control" required>
                 </div>
+
                 <div class="form-group">
                     <label>Imagem do Produto</label>
-                    <input type="file" id="prod-imagem" accept="image/*">
+                    <input type="file" id="prod-imagem" class="form-control" accept="image/*">
                 </div>
-                
-                <div class="toggle-wrapper">
-                    <label>Preço Variável?</label>
+
+                <div class="form-group checkbox-item">
                     <input type="checkbox" id="prod-tipo-preco" onchange="toggleTipoPreco()">
+                    <label for="prod-tipo-preco" style="margin-bottom:0; cursor:pointer;">Este produto tem preço variável / dinâmico</label>
                 </div>
 
                 <div id="bloco-preco-fixo" class="form-group">
                     <label>Preço Fixo (€)</label>
-                    <input type="number" step="0.01" id="prod-preco-fixo">
+                    <input type="number" id="prod-preco-fixo" class="form-control" step="0.01" value="0.00">
                 </div>
 
-                <div id="bloco-preco-variavel" style="display: none;">
-                    <div class="checkbox-grid">
-                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="tamanho" onchange="gerarMatriz()"> Tamanho</div>
-                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="tipo_impressao" onchange="gerarMatriz()"> Tipo Impressão</div>
+                <div id="bloco-preco-variavel" style="display: none; background: #f8fafc; padding: 1rem; border-radius: 8px; border: 1px dashed #cbd5e1; margin-bottom: 1.2rem;">
+                    <label style="font-weight: 700;">Selecione os Fatores Multiplicadores:</label>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="dimensao" onchange="gerarMatriz()"> Dimensão</div>
                         <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="quantidade" onchange="gerarMatriz()"> Quantidade</div>
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="papel" onchange="gerarMatriz()"> Tipo de Papel</div>
                         <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="acabamento" onchange="gerarMatriz()"> Acabamento</div>
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="cantos_arredondados" onchange="gerarMatriz()"> Cantos Arredondados</div>
+                        <div class="checkbox-item"><input type="checkbox" id="chk-mala" class="chk-fator" value="mala" onchange="gerarMatriz()"> Tipo de Mala</div>
                     </div>
+
+                    <div class="checkbox-group" id="item-chk-acessorios-mala" style="display:none; margin-top: 0.5rem; padding-left: 1rem;">
+                        <div class="checkbox-item"><input type="checkbox" id="chk-acessorios-mala" class="chk-fator" value="acessorios_mala" onchange="gerarMatriz()"> Incluir Acessórios da Mala</div>
+                    </div>
+
+                    <div id="inputs-valores-fatores" style="margin-top: 1.2rem; display: flex; flex-direction: column; gap: 0.8rem;"></div>
                     
-                    <div id="inputs-valores-fatores"></div>
-                    <div id="container-tabela-matriz"></div>
+                    <div id="seccao-tabela-matriz" style="margin-top: 1.5rem; display: none;">
+                        <label style="font-weight:700; margin-bottom:0.5rem; display:block;">Matriz Combinatória de Preços</label>
+                        <div id="container-tabela-matriz" style="overflow-x:auto; background:white; border:1px solid #e2e8f0; border-radius:6px;"></div>
+                    </div>
                 </div>
 
-                <div class="flex-end">
-                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar Produto</button>
-                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Guardar Produto</button>
             </form>
         </div>
     </div>

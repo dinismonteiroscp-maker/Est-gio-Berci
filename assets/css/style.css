@@ -1,281 +1,362 @@
+/* =========================================================================
+   SISTEMA DE GESTÃO BERCI - CORE CSS (COMPLETO E BLINDADO)
+   ========================================================================= */
+
+/* 1. Reset Estrutural e Variáveis */
 :root {
-    --bg-primary: #f8f9fa;
-    --bg-white: #ffffff;
-    --text-main: #212529;
-    --text-muted: #6c757d;
-    --accent: #000000;
-    --border-color: #e9ecef;
-    --radius: 8px;
-    --shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    --transition: all 0.25s ease;
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --slate-900: #0f172a;
+    --slate-700: #334155;
+    --slate-600: #475569;
+    --slate-500: #64748b;
+    --slate-200: #e2e8f0;
+    --slate-100: #f1f5f9;
+    --slate-50:  #f8fafc;
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 * {
-    box-sizing: border-box;
     margin: 0;
     padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-primary);
-    color: var(--text-main);
-    line-height: 1.5;
+    background-color: var(--slate-100);
+    color: var(--slate-700);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
+/* 2. Header Superior */
 header {
-    background: var(--bg-white);
-    padding: 1.5rem 2rem;
-    border-bottom: 1px solid var(--border-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 0 2rem;
+    background: #ffffff;
+    border-bottom: 1px solid var(--slate-200);
+    height: 70px;
+    width: 100%;
 }
 
-header h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: -0.5px; }
-header a { color: var(--text-muted); text-decoration: none; font-size: 0.9rem; transition: var(--transition); }
-header a:hover { color: var(--accent); }
-
-.layout-split {
-    display: grid;
-    grid-template-columns: 280px 1fr;
-    min-height: calc(100vh - 73px);
+.logo {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--slate-900);
 }
 
-/* Menu Lateral / Accordion */
-aside {
-    background: var(--bg-white);
-    border-right: 1px solid var(--border-color);
-    padding: 1.5rem;
+.btn-modo {
+    text-decoration: none;
+    color: var(--slate-600);
+    font-weight: 500;
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: background 0.2s;
 }
 
+.btn-modo:hover {
+    background: var(--slate-100);
+    color: var(--slate-900);
+}
+
+/* 3. Contentor Principal (Layout de Duas Colunas) */
+.main-container {
+    display: flex;
+    flex: 1;
+    width: 100%;
+    height: calc(100vh - 70px);
+}
+
+/* Coluna Esquerda: Sidebar */
+.sidebar, #menu-admin, #menu-categorias {
+    width: 320px;
+    min-width: 320px;
+    max-width: 320px;
+    background: #ffffff;
+    border-right: 1px solid var(--slate-200);
+    padding: 1.5rem 1rem;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Coluna Direita: Área de Conteúdo */
+.conteudo {
+    flex: 1;
+    padding: 2rem;
+    background: var(--slate-50);
+    overflow-y: auto;
+    height: 100%;
+}
+
+/* 4. Elementos do Menu Lateral (Acórdão e Sub-Blocos) */
 .accordion-item {
-    margin-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    background: var(--slate-50);
+    border-radius: 8px;
+    border: 1px solid var(--slate-200);
+    padding: 0.5rem;
 }
 
 .accordion-header {
-    width: 100%;
-    background: none;
-    border: none;
-    text-align: left;
-    padding: 0.75rem 1rem;
     font-size: 0.95rem;
-    font-weight: 500;
+    font-weight: 700;
+    color: var(--slate-900);
+    border: none;
+    background: none;
     cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-radius: var(--radius);
-    transition: var(--transition);
+    text-align: left;
 }
 
-.accordion-header:hover { background: var(--bg-primary); }
-
 .accordion-content {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s cubic-bezier(0, 1, 0, 1);
-    padding-left: 1rem;
+    display: none;
 }
 
 .accordion-content.open {
-    max-height: 1000px;
-    transition: max-height 0.3s cubic-bezier(1, 0, 1, 0);
+    display: block;
+}
+
+/* Linhas das Subcategorias */
+.subcat-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem;
+    margin-top: 0.4rem;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid var(--slate-100);
 }
 
 .subcat-btn {
+    background: none;
+    border: none;
+    font-size: 0.9rem;
+    color: var(--slate-600);
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    flex: 1;
+    padding-right: 0.5rem;
+}
+
+.subcat-btn:hover {
+    color: var(--primary);
+}
+
+/* Grupos de Botões de Ação Dinâmicos (✎ e ✕) */
+.menu-row-actions {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+}
+
+.btn-action {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    font-size: 0.8rem;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    color: var(--slate-600);
+    transition: all 0.2s;
+}
+
+.btn-edit:hover {
+    background: var(--primary);
+    color: #ffffff;
+    border-color: var(--primary);
+}
+
+.btn-delete:hover {
+    background: #ef4444;
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
+/* Botões Utilitários Tracejados (+ Subcategoria) */
+.btn-dashed {
     display: block;
     width: 100%;
     background: none;
-    border: none;
-    text-align: left;
-    padding: 0.5rem 1rem;
-    font-size: 0.88rem;
-    color: var(--text-muted);
+    border: 1px dashed #cbd5e1;
+    padding: 0.5rem;
+    text-align: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--slate-600);
+    border-radius: 6px;
+    margin-top: 0.5rem;
     cursor: pointer;
-    border-radius: var(--radius);
-    margin-top: 0.2rem;
+    transition: background 0.2s;
 }
 
-.subcat-btn:hover, .subcat-btn.active {
-    color: var(--accent);
-    background: var(--bg-primary);
+.btn-dashed:hover {
+    background: var(--slate-100);
+    color: var(--slate-900);
 }
 
-/* Área Principal / Grid de Produtos */
-main {
-    padding: 2rem;
-}
-
-.grid-produtos {
+/* 5. Grelha de Produtos */
+.produtos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 1.5rem;
+    align-content: start;
 }
 
+.mensagem-inicial {
+    grid-column: 1 / -1;
+    color: var(--slate-500);
+    font-size: 1rem;
+    text-align: center;
+    padding: 3rem 0;
+}
+
+/* Cartão de Produto Individual */
 .card-produto {
-    background: var(--bg-white);
-    border-radius: var(--radius);
-    border: 1px solid var(--border-color);
+    background: #ffffff;
+    border: 1px solid var(--slate-200);
+    border-radius: 12px;
     padding: 1rem;
+    position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
-    box-shadow: var(--shadow);
-    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-produto:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
 }
 
 .card-produto img {
     width: 100%;
     height: 180px;
     object-fit: cover;
-    border-radius: calc(var(--radius) - 2px);
-    background: var(--bg-primary);
+    border-radius: 8px;
+    background: var(--slate-100);
     margin-bottom: 1rem;
 }
 
-.card-produto h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
-
-.select-grupo {
+.card-produto h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--slate-900);
     margin-bottom: 0.75rem;
+    line-height: 1.4;
 }
 
-.select-grupo label {
-    display: block;
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    color: var(--text-muted);
-    margin-bottom: 0.25rem;
+/* Espaçador estrutural para fixar altura das opções */
+.opcoes-container {
+    min-height: 80px; 
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
 }
-
-select, input[type="text"], input[type="number"], file {
-    width: 100%;
-    padding: 0.6rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
-    background: var(--bg-white);
-    font-size: 0.88rem;
-    outline: none;
-    transition: var(--transition);
-}
-
-select:focus, input:focus { border-color: var(--accent); }
 
 .preco-tag {
     font-size: 1.2rem;
-    font-weight: 700;
+    font-weight: 800;
+    color: var(--primary);
     margin-top: auto;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-color);
+    border-top: 1px solid var(--slate-100);
+    padding-top: 0.75rem;
 }
 
-/* Estilos de Administração / Linhas Tracejadas */
-.btn-dashed {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px dashed #ced4da;
-    background: transparent;
-    border-radius: var(--radius);
-    color: var(--text-muted);
-    font-size: 0.88rem;
-    cursor: pointer;
-    transition: var(--transition);
-    margin: 0.5rem 0;
-}
-
-.btn-dashed:hover {
-    border-color: var(--accent);
-    color: var(--accent);
-}
-
-.card-produto.dashed-card {
-    border: 2px dashed #ced4da;
-    box-shadow: none;
-    justify-content: center;
-    align-items: center;
-    min-height: 280px;
-    cursor: pointer;
-}
-.card-produto.dashed-card:hover { border-color: var(--accent); color: var(--accent); }
-
-.quick-actions {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    gap: 0.3rem;
-    background: rgba(255,255,255,0.9);
-    padding: 2px;
-    border-radius: var(--radius);
-}
-
-.btn-action {
+/* Cartões Especiais de Ação (Dashed Admin Card) */
+.dashed-card {
+    border: 2px dashed #cbd5e1;
     background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    font-size: 0.85rem;
-    color: var(--text-muted);
-}
-.btn-action:hover { color: var(--accent); }
-
-/* Modais Simples */
-.modal {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
     justify-content: center;
-    opacity: 0; pointer-events: none;
-    transition: var(--transition);
-    z-index: 100;
-}
-.modal.open { opacity: 1; pointer-events: auto; }
-
-.modal-content {
-    background: var(--bg-white);
-    padding: 2rem;
-    border-radius: var(--radius);
-    width: 100%;
-    max-width: 500px;
-    box-shadow: var(--shadow);
-}
-.modal-content h2 { font-size: 1.15rem; margin-bottom: 1rem; }
-
-.form-group { margin-bottom: 1rem; }
-.form-group label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; }
-
-.flex-end { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1.5rem; }
-
-.btn {
-    padding: 0.6rem 1.2rem;
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius);
+    align-items: center;
+    min-height: 320px;
     cursor: pointer;
-    font-size: 0.88rem;
-    background: var(--bg-white);
+    color: var(--slate-500);
+    font-weight: 600;
 }
-.btn-primary { background: var(--accent); color: var(--bg-white); border: none; }
 
-/* Switch & Tabela Matriz */
-.toggle-wrapper { display: flex; align-items: center; gap: 0.5rem; margin: 1rem 0; }
-.checkbox-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 1rem; }
-.checkbox-item { display: flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; }
+.dashed-card:hover {
+    background: #ffffff;
+    border-color: var(--primary);
+    color: var(--primary);
+}
 
-.matriz-table {
+.card-produto .quick-actions {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    display: flex;
+    gap: 0.4rem;
+    z-index: 10;
+}
+
+/* 6. Tabelas de Matriz Combinatória (Modais Admin) */
+table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 1rem;
-    font-size: 0.8rem;
+    margin-top: 0.5rem;
+    background: #ffffff;
 }
-.matriz-table th, .matriz-table td {
-    border: 1px solid var(--border-color);
-    padding: 0.4rem;
+
+th, td {
+    padding: 10px 12px;
     text-align: left;
+    border-bottom: 1px solid var(--slate-200);
+    font-size: 0.85rem;
 }
-.matriz-table input { padding: 0.25rem; }
+
+th {
+    background: var(--slate-100);
+    color: var(--slate-900);
+    font-weight: 700;
+}
+
+tr:hover td {
+    background: var(--slate-50);
+}
+
+/* Inputs da Matriz dentro das tabelas */
+.preco-variante-input {
+    width: 90px;
+    padding: 5px 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    text-align: right;
+    font-weight: 600;
+    color: var(--slate-900);
+}
+
+.preco-variante-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* Container de Opções de Fatores Gerados no Modal */
+.fator-input-box {
+    background: #ffffff;
+    padding: 0.75rem;
+    border: 1px solid var(--slate-200);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+}
+
+.input-valores-fator {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}

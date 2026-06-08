@@ -3,28 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Berci-Gestão de Produtos</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="shortcut icon" href="www.berci.pt-favicon.ico" type="image/x-icon">
+    <title>Berci - Gráfica</title>
+    <link rel="stylesheet" href="assets/css/loja.css">
 </head>
-<body>
+<body class="loja-publica">
 
     <header>
-        <h1>Berci</h1>
-        <a href="admin.html">Modo Edição →</a>
+        <div class="logo">Berci</div>
+        <a href="admin.html" class="btn-modo">Modo Edição →</a>
     </header>
 
-    <div class="layout-split">
-        <aside id="menu-categorias">
-            </aside>
+    <div class="main-container">
+        <!-- MENU LATERAL RETRÁTIL E INTELIGENTE -->
+        <aside class="sidebar" id="menu-categorias"></aside>
 
-        <main>
-            <div class="grid-produtos" id="grid-produtos">
-                <p style="color: var(--text-muted);">Selecione uma subcategoria para visualizar os produtos.</p>
+        <!-- ÁREA PÚBLICA DE PRODUTOS -->
+        <main class="conteudo">
+            <div id="grelha-produtos" class="produtos-grid">
+                <p class="mensagem-inicial">Selecione uma categoria ou subcategoria para visualizar os produtos.</p>
             </div>
         </main>
     </div>
 
+    <!-- JAVASCRIPT DA LOJA -->
     <script src="assets/js/app.js"></script>
 </body>
 </html>
