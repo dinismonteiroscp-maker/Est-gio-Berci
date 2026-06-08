@@ -1,0 +1,9 @@
+# Ignorar toda a pasta de uploads (imagens/arquivos que usuários enviarem)
+uploads/
+
+# Ignorar arquivos de configuração que tenham senhas do banco de dados (opcional)
+# config/conexao.php
+
+# Ignorar arquivos do próprio sistema operacional ou do VS Code
+.DS_Store
+.vscode/
