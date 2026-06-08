@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Berci - Modo Edição </title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="shortcut icon" href="www.berci.pt-favicon.ico" type="image/x-icon">
+</head>
+<body>
+
+    <header>
+        <h1>Painel de Gestão (Modo Edição)</h1>
+        <a href="index.html">← Ver Inicio</a>
+    </header>
+
+    <div class="layout-split">
+        <aside>
+            <button class="btn-dashed" onclick="abrirModalCategoria()">+ Adicionar Categoria</button>
+            <div id="menu-admin"></div>
+        </aside>
+
+        <main>
+            <div class="grid-produtos" id="grid-produtos-admin">
+                <p style="color: var(--text-muted);">Selecione uma subcategoria para gerir os produtos.</p>
+            </div>
+        </main>
+    </div>
+
+    <div class="modal" id="modal-categoria">
+        <div class="modal-content">
+            <h2 id="modal-cat-titulo">Nova Categoria</h2>
+            <form id="form-categoria" onsubmit="guardarCategoria(event)">
+                <input type="hidden" id="cat-id">
+                <div class="form-group">
+                    <label>Nome da Categoria</label>
+                    <input type="text" id="cat-nome" required>
+                </div>
+                <div class="flex-end">
+                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-subcategoria">
+        <div class="modal-content">
+            <h2>Nova Subcategoria</h2>
+            <form id="form-subcategoria" onsubmit="guardarSubcategoria(event)">
+                <input type="hidden" id="subcat-id">
+                <input type="hidden" id="subcat-cat-id">
+                <div class="form-group">
+                    <label>Nome da Subcategoria</label>
+                    <input type="text" id="subcat-nome" required>
+                </div>
+                <div class="flex-end">
+                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button> 
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal" id="modal-produto" style="max-width:600px;">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2>Gerir Produto</h2>
+            <form id="form-produto" onsubmit="guardarProduto(event)">
+                <input type="hidden" id="prod-id">
+                <input type="hidden" id="prod-subcat-id">
+                <input type="hidden" id="prod-img-atual">
+
+                <div class="form-group">
+                    <label>Nome do Produto</label>
+                    <input type="text" id="prod-nome" required>
+                </div>
+                <div class="form-group">
+                    <label>Imagem do Produto</label>
+                    <input type="file" id="prod-imagem" accept="image/*">
+                </div>
+                
+                <div class="toggle-wrapper">
+                    <label>Preço Variável?</label>
+                    <input type="checkbox" id="prod-tipo-preco" onchange="toggleTipoPreco()">
+                </div>
+
+                <div id="bloco-preco-fixo" class="form-group">
+                    <label>Preço Fixo (€)</label>
+                    <input type="number" step="0.01" id="prod-preco-fixo">
+                </div>
+
+                <div id="bloco-preco-variavel" style="display: none;">
+                    <div class="checkbox-grid">
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="tamanho" onchange="gerarMatriz()"> Tamanho</div>
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="tipo_impressao" onchange="gerarMatriz()"> Tipo Impressão</div>
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="quantidade" onchange="gerarMatriz()"> Quantidade</div>
+                        <div class="checkbox-item"><input type="checkbox" class="chk-fator" value="acabamento" onchange="gerarMatriz()"> Acabamento</div>
+                    </div>
+                    
+                    <div id="inputs-valores-fatores"></div>
+                    <div id="container-tabela-matriz"></div>
+                </div>
+
+                <div class="flex-end">
+                    <button type="button" class="btn" onclick="fecharModais()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar Produto</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="assets/js/admin.js"></script>
+</body>
+</html>
