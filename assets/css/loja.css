@@ -66,6 +66,67 @@ header {
     height: calc(100vh - 70px);
     position: sticky;
     top: 70px;
+    overflow-y: auto;
+}
+
+/* Elementos do Acordeão */
+.accordion-item {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    padding-bottom: 0.5rem;
+}
+
+.accordion-header {
+    background: none;
+    border: none;
+    outline: none;
+    font-weight: 700;
+    width: 100%;
+    text-align: left;
+    font-size: 1rem;
+    color: #1e293b;
+    padding: 8px 0;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.accordion-header:hover {
+    color: #0284c7;
+}
+
+/* Controlo das Subcategorias (Escondidas por padrão) */
+.accordion-content {
+    display: none;
+    padding-left: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Quando o pai tiver a classe .open, mostra o conteúdo */
+.accordion-item.open .accordion-content {
+    display: block;
+}
+
+.subcat-container {
+    margin-bottom: 4px;
+}
+
+.subcat-btn {
+    width: 100%;
+    text-align: left;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.subcat-btn:hover {
+    background: #e0f2fe;
+    color: #0369a1;
+    border-color: #bae6fd;
 }
 
 /* Área de Conteúdo Direito */
@@ -77,7 +138,7 @@ header {
 
 .produtos-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 1.5rem;
 }
 
@@ -85,4 +146,37 @@ header {
     color: #94a3b8;
     font-size: 0.95rem;
     grid-column: 1 / -1;
+}
+
+/* Correção Crítica: Limitação dos Cards e Imagens dos Produtos */
+.card-produto {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+}
+
+.card-produto img {
+    width: 100%;
+    height: 180px;
+    object-fit: cover; /* Faz a imagem preencher o espaço sem deformar */
+    border-radius: 6px;
+    background-color: #f1f5f9;
+}
+
+.card-produto h3 {
+    font-size: 1.1rem;
+    color: #0f172a;
+    font-weight: 600;
+}
+
+.preco-tag {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #10b981;
+    margin-top: auto; /* Empurra o preço sempre para o fundo do card */
 }

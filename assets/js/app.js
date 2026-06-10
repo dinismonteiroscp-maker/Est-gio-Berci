@@ -14,38 +14,53 @@ async function carregarEstruturaCliente() {
         if (!res.ok) throw new Error("Erro de rede ao ligar à API.");
         
         const estrutura = await res.json();
-        // Correção do ID: index.html usa "menu-categorias"
         const menu = document.getElementById("menu-categorias"); 
         if (!menu) return;
 
         menu.innerHTML = ""; 
 
         estrutura.forEach(cat => {
-            const div = document.createElement("div");
-            div.className = "accordion-item";
+            const divItem = document.createElement("div");
+            divItem.className = "accordion-item";
             
+            // Construção das subcategorias
             let subsHtml = "";
             if (cat.subcategorias && Array.isArray(cat.subcategorias)) {
                 cat.subcategorias.forEach(sub => {
                     subsHtml += `
                         <div class="subcat-container">
-                            <button class="subcat-btn" onclick="carregarProdutosCliente(${sub.id})">${sub.nome}</button>
+                            <button class="subcat-btn" onclick="carregarProdutosCliente(${sub.id}, event)">${sub.nome}</button>
                         </div>
                     `;
                 });
             }
 
-            div.innerHTML = `
-                <div style="padding: 6px 10px; margin-top:0.2rem;">
-                    <button class="accordion-header" style="background:none; border:none; outline:none; font-weight:700; width:100%; text-align:left;">
+            // Estrutura do acordeão
+            divItem.innerHTML = `
+                <div class="header-container">
+                    <button class="accordion-header">
                         ${cat.nome}
                     </button>
                 </div>
-                <div class="accordion-content open" style="padding-left:0.5rem; margin-top: 0.4rem;">
+                <div class="accordion-content">
                     ${subsHtml}
                 </div>
             `;
-            menu.appendChild(div);
+
+            // EVENTO DUPLO: Clique na Categoria Mãe
+            const btnHeader = divItem.querySelector(".accordion-header");
+            btnHeader.addEventListener("click", () => {
+                // 1. Comportamento Visual: Fecha os outros acordeões e abre/fecha o atual
+                document.querySelectorAll(".accordion-item").forEach(item => {
+                    if (item !== divItem) item.classList.remove("open");
+                });
+                divItem.classList.toggle("open");
+
+                // 2. Comportamento de Dados: Carrega TODOS os produtos que pertencem a esta categoria mãe
+                carregarProdutosCategoriaMae(cat);
+            });
+
+            menu.appendChild(divItem);
         });
     } catch (error) {
         console.error("Erro ao carregar o menu do cliente:", error);
@@ -55,7 +70,41 @@ async function carregarEstruturaCliente() {
 // =========================================================================
 // 2. CARREGAR PRODUTOS DA API (CLIENTE)
 // =========================================================================
-async function carregarProdutosCliente(subcatId) {
+
+// Ação ao clicar na Categoria Mãe: Junta todos os produtos das suas subcategorias
+function carregarProdutosCategoriaMae(categoria) {
+    const grid = document.getElementById("grelha-produtos");
+    if (!grid) return;
+
+    if (!categoria.subcategorias || categoria.subcategorias.length === 0) {
+        grid.innerHTML = "<p class='mensagem-inicial'>Esta categoria não tem subcategorias ou produtos disponíveis.</p>";
+        return;
+    }
+
+    grid.innerHTML = "<p class='mensagem-inicial'>A carregar produtos da categoria...</p>";
+
+    // Faz pedidos em paralelo para todas as subcategorias pertencentes a esta categoria mãe
+    const promessas = categoria.subcategorias.map(sub => 
+        fetch(`api/api.php?acao=produtos&subcategoria_id=${sub.id}`)
+            .then(res => res.ok ? res.json() : [])
+            .catch(() => [])
+    );
+
+    Promise.all(promessas).then(resultados => {
+        // Junta todos os arrays de produtos num único array plano
+        let todosOsProdutos = resultados.flat();
+        renderizarProdutosNaGrelha(todosOsProdutos);
+    }).catch(err => {
+        console.error("Erro ao agregar produtos da categoria mãe:", err);
+        grid.innerHTML = "<p class='mensagem-inicial'>Erro ao carregar os produtos desta categoria.</p>";
+    });
+}
+
+// Ação ao clicar na Subcategoria específica
+async function carregarProdutosCliente(subcatId, event) {
+    // Evita que o clique na subcategoria dispare o evento do elemento pai (categoria mãe)
+    if (event) event.stopPropagation();
+
     try {
         const res = await fetch(`api/api.php?acao=produtos&subcategoria_id=${subcatId}`);
         if (!res.ok) throw new Error("Erro ao puxar produtos.");
@@ -76,7 +125,7 @@ function renderizarProdutosNaGrelha(produtos) {
     grid.innerHTML = "";
 
     if (!produtos || produtos.length === 0) {
-        grid.innerHTML = "<p class='mensagem-inicial'>Nenhum produto disponível de momento.</p>";
+        grid.innerHTML = "<p class='mensagem-inicial'>Nenhum produto disponível de momento para esta seleção.</p>";
         return;
     }
 
@@ -108,7 +157,7 @@ function renderizarProdutosNaGrelha(produtos) {
                     seccaoOpcoes += `
                         <div class="fator-grupo" style="margin-bottom: 0.5rem;">
                             <label style="font-size:0.8rem; font-weight:600; text-transform:capitalize; display:block; margin-bottom:2px;">${labelFormatado}:</label>
-                            <select class="select-opcao-publica" data-fator="${fator}" onchange="recalcularPrecoPublico(${prod.id})" style="width:100%; padding:4px; border-radius:4px; border:1px solid #cbd5e1;">
+                            <select class="select-opcao-publica" data-fator="${fator}" onchange="recalcularPrecoPublico(${prod.id})" style="width:100%; padding:6px; border-radius:4px; border:1px solid #cbd5e1; background:#fff;">
                                 ${atributosMapeados[fator].map(op => `<option value="${op}">${op}</option>`).join('')}
                             </select>
                         </div>
@@ -120,12 +169,17 @@ function renderizarProdutosNaGrelha(produtos) {
             seccaoOpcoes = `<div class="opcoes-container"></div>`;
         }
 
+        // Formatação do preço fixo inicial com vírgula padrão PT-PT
+        let precoFixoFormatado = prod.tipo_preco === 'fixo' 
+            ? parseFloat(prod.preco_fixo).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €' 
+            : 'A calcular...';
+
         card.innerHTML = `
             <img src="${imgUrl}" alt="${prod.nome}">
             <h3>${prod.nome}</h3>
             ${seccaoOpcoes}
             <div class="preco-tag" id="preco-prod-${prod.id}">
-                ${prod.tipo_preco === 'fixo' ? parseFloat(prod.preco_fixo).toFixed(2) + ' €' : 'A calcular...'}
+                ${precoFixoFormatado}
             </div>
         `;
         grid.appendChild(card);
@@ -165,8 +219,10 @@ function recalcularPrecoPublico(produtoId) {
         return condicao;
     });
 
+    // Formatação do preço dinâmico calculado com vírgula padrão PT-PT
     if (varianteCorrespondente) {
-        precoTag.innerText = parseFloat(varianteCorrespondente.preco).toFixed(2) + " €";
+        let precoVariavelFormatado = parseFloat(varianteCorrespondente.preco).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        precoTag.innerText = precoVariavelFormatado + " €";
     } else {
         precoTag.innerText = "Sob Consulta";
     }
