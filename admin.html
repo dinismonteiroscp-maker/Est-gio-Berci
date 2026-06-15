@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Berci - Painel de Administração | Modo Edição</title>
+    <title>Berci - Painel de Administracao | Modo Edicao</title>
     
     <link rel="shortcut icon" href="image/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="assets/css/style.css?v=5">
@@ -69,8 +69,6 @@
         .btn-primary:hover { background: #1d4ed8; }
         .btn-secondary { background: #64748b; color: white; }
         .btn-secondary:hover { background: #475569; }
-        .btn-danger { background: #ef4444; color: white; }
-        .btn-danger:hover { background: #dc2626; }
         .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
         .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
         
@@ -202,6 +200,47 @@
             display: flex;
             gap: 8px;
         }
+        
+        .tree-item {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+        .tree-item-categoria {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .tree-item-subcategoria {
+            margin-left: 20px;
+            margin-top: 5px;
+        }
+        .tree-item-produto {
+            margin-left: 40px;
+            margin-top: 3px;
+        }
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .checkbox-label:hover {
+            background: #f1f5f9;
+        }
+        .checkbox-label input {
+            margin: 0;
+        }
+        .selected-count {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-left: 5px;
+        }
+        .loading {
+            text-align: center;
+            color: #64748b;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -213,7 +252,8 @@
     <div style="flex: 2; text-align: center;">
         <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a;">Modo Edicao</h1>
     </div>
-    <div style="flex: 1; display: flex; justify-content: flex-end;">
+    <div style="flex: 1; display: flex; justify-content: flex-end; gap: 1rem;">
+        <button class="btn btn-secondary" onclick="abrirModalAtualizarPrecos()">Atualizar Precos</button>
         <a href="index.html" style="text-decoration: none; color: #475569; padding: 0.6rem 1.2rem; border-radius: 6px; background: #f1f5f9;">Sair do Modo Edicao →</a>
     </div>
 </header>
@@ -338,12 +378,12 @@
             </div>
             
             <div class="form-group">
-                <label>Escopo</label>
+                <label>Aplicar a</label>
                 <select id="fator-escopo" class="form-control" onchange="mudarEscopoFator()">
-                    <option value="global">Global (todos os produtos)</option>
-                    <option value="categoria">Categoria (apenas nesta categoria)</option>
-                    <option value="subcategoria">Subcategoria (apenas nesta subcategoria)</option>
-                    <option value="produto">Produto (apenas neste produto)</option>
+                    <option value="global">Todos os produtos (Global)</option>
+                    <option value="categoria">Apenas produtos desta categoria</option>
+                    <option value="subcategoria">Apenas produtos desta subcategoria</option>
+                    <option value="produto">Apenas este produto</option>
                 </select>
             </div>
             
@@ -359,6 +399,34 @@
     </div>
 </div>
 
+<!-- Modal Atualizar Precos -->
+<div id="modal-atualizar-precos" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <button class="close-modal" onclick="fecharModais()">✕</button>
+        <h2>Atualizar Precos</h2>
+        
+        <div class="form-group">
+            <label>Percentagem de aumento (%)</label>
+            <input type="number" id="percentagem-aumento" class="form-control" step="0.01" placeholder="Ex: 5" value="5">
+            <small style="color: #64748b;">Digite um valor positivo para aumentar ou negativo para diminuir (ex: -5)</small>
+        </div>
+        
+        <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem;">
+            <button type="button" class="btn btn-secondary" onclick="selecionarTodos()">Selecionar Todos</button>
+            <button type="button" class="btn btn-secondary" onclick="desmarcarTodos()">Desmarcar Todos</button>
+        </div>
+        
+        <div id="arvore-selecao" style="max-height: 400px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+            <div class="loading">A carregar estrutura...</div>
+        </div>
+        
+        <div style="display: flex; gap: 0.5rem;">
+            <button type="button" class="btn btn-primary" onclick="aplicarAumentoPrecos()" style="flex: 1;">Aplicar Aumento</button>
+            <button type="button" class="btn btn-secondary" onclick="fecharModais()" style="flex: 1;">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <script src="assets/js/admin.js"></script>
 </body>
-</html> 
+</html>

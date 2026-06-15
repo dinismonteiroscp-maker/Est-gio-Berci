@@ -379,6 +379,105 @@ switch ($acao) {
         ");
         echo json_encode($stmt->fetchAll());
         break;
+        // ==================== ESTRUTURA COMPLETA PARA ATUALIZAR PRECOS ====================
+case 'listar_estrutura_completa':
+    $stmt = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+    $categorias = $stmt->fetchAll();
+    
+    foreach ($categorias as &$cat) {
+        $stmtSub = $pdo->prepare("SELECT * FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
+        $stmtSub->execute([$cat['id']]);
+        $subcategorias = $stmtSub->fetchAll();
+        
+        foreach ($subcategorias as &$sub) {
+            $stmtProd = $pdo->prepare("SELECT id, nome, tipo_preco, preco_fixo FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
+            $stmtProd->execute([$sub['id']]);
+            $sub['produtos'] = $stmtProd->fetchAll();
+        }
+        $cat['subcategorias'] = $subcategorias;
+    }
+    
+    echo json_encode($categorias);
+    break;
+
+// ==================== ATUALIZAR PRECOS ====================
+// ==================== ATUALIZAR PRECOS ====================
+case 'atualizar_precos':
+    $data = json_decode(file_get_contents('php://input'), true);
+    $percentagem = floatval($data['percentagem'] ?? 0);
+    $categorias = $data['categorias'] ?? [];
+    $subcategorias = $data['subcategorias'] ?? [];
+    $produtos = $data['produtos'] ?? [];
+    
+    $produtosAfetados = 0;
+    $variantesAfetadas = 0;
+    $fator = 1 + ($percentagem / 100);
+    
+    try {
+        $pdo->beginTransaction();
+        
+        if (!empty($categorias)) {
+            $placeholders = implode(',', array_fill(0, count($categorias), '?'));
+            $stmt = $pdo->prepare("
+                SELECT p.id FROM produtos p
+                JOIN subcategorias s ON p.subcategoria_id = s.id
+                WHERE s.categoria_id IN ($placeholders)
+            ");
+            $stmt->execute($categorias);
+            $produtosCategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $produtos = array_merge($produtos, $produtosCategoria);
+        }
+        
+        if (!empty($subcategorias)) {
+            $placeholders = implode(',', array_fill(0, count($subcategorias), '?'));
+            $stmt = $pdo->prepare("
+                SELECT id FROM produtos WHERE subcategoria_id IN ($placeholders)
+            ");
+            $stmt->execute($subcategorias);
+            $produtosSubcategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            $produtos = array_merge($produtos, $produtosSubcategoria);
+        }
+        
+        $produtos = array_unique($produtos);
+        
+        if (!empty($produtos)) {
+            $placeholders = implode(',', array_fill(0, count($produtos), '?'));
+            
+            // Atualizar precos fixos - removido updated_at
+            $stmt = $pdo->prepare("
+                UPDATE produtos 
+                SET preco_fixo = preco_fixo * ?
+                WHERE id IN ($placeholders) AND tipo_preco = 'fixo'
+            ");
+            $params = array_merge([$fator], $produtos);
+            $stmt->execute($params);
+            $produtosAfetados = $stmt->rowCount();
+            
+            // Atualizar variantes
+            $stmt = $pdo->prepare("
+                UPDATE produto_variantes v
+                SET v.preco = v.preco * ?
+                WHERE v.produto_id IN ($placeholders)
+            ");
+            $params2 = array_merge([$fator], $produtos);
+            $stmt->execute($params2);
+            $variantesAfetadas = $stmt->rowCount();
+        }
+        
+        $pdo->commit();
+        
+        echo json_encode([
+            "sucesso" => true,
+            "produtos_afetados" => $produtosAfetados,
+            "variantes_afetadas" => $variantesAfetadas,
+            "percentagem_aplicada" => $percentagem
+        ]);
+        
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(["erro" => $e->getMessage()]);
+    }
+    break;
 
     default:
         echo json_encode(["erro" => "Ação não encontrada"]);

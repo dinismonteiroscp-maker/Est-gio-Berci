@@ -1,6 +1,13 @@
 // ==================== VARIAVEIS GLOBAIS ====================
 let subcatAtiva = null;
 let estruturaLocal = [];
+let contextoAtual = null;
+let estruturaSelecao = [];
+let selecionados = {
+    categorias: new Set(),
+    subcategorias: new Set(),
+    produtos: new Set()
+};
 
 // ==================== INICIALIZACAO ====================
 document.addEventListener("DOMContentLoaded", () => {
@@ -17,6 +24,7 @@ function escapeHtml(text) {
 
 function fecharModais() {
     document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
+    contextoAtual = null;
 }
 
 // ==================== CATEGORIAS ====================
@@ -293,11 +301,11 @@ function renderizarTabelaCombinatoria() {
     combinacoes.forEach((combo) => {
         let arrCombo = Array.isArray(combo) ? combo : [combo];
         tableHtml += `<tr class="linha-matriz" data-combo='${JSON.stringify(arrCombo)}'>`;
-        arrCombo.forEach(v => tableHtml += `<td style="padding:8px;">${escapeHtml(v)}</td>`);
-        tableHtml += `<td style="padding:8px;"><input type="number" step="0.01" class="preco-variante-input" placeholder="0.00" style="width:100px;"></td>`;
+        arrCombo.forEach(v => tableHtml += `<td style="padding:8px;">${escapeHtml(v)}<\/td>`);
+        tableHtml += `<td style="padding:8px;"><input type="number" step="0.01" class="preco-variante-input" placeholder="0.00" style="width:100px;"><\/td>`;
     });
 
-    tableHtml += `</tbody></table>`;
+    tableHtml += `<\/tbody><\/table>`;
     document.getElementById('container-tabela-matriz').innerHTML = tableHtml;
 }
 
@@ -471,12 +479,21 @@ async function carregarListaFatores() {
     
     container.innerHTML = `
         <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
-            ${fatores.map(f => `
+            ${fatores.map(f => {
+                let aplicaTexto = '';
+                if (f.escopo === 'global') aplicaTexto = 'Todos os produtos';
+                else if (f.escopo === 'categoria') aplicaTexto = 'Categoria';
+                else if (f.escopo === 'subcategoria') aplicaTexto = 'Subcategoria';
+                else if (f.escopo === 'produto') aplicaTexto = 'Produto';
+                else if (f.escopo === 'produto_pendente') aplicaTexto = 'Produto (pendente)';
+                else aplicaTexto = f.escopo;
+                
+                return `
                 <div class="fator-row">
                     <div class="fator-info">
                         <div class="fator-nome">${escapeHtml(f.nome)}</div>
                         <div class="fator-detalhes">
-                            Escopo: ${f.escopo}${f.entidade_nome ? ' - ' + f.entidade_nome : ''}
+                            Aplica-se a: ${aplicaTexto}${f.entidade_nome ? ' - ' + f.entidade_nome : ''}
                         </div>
                     </div>
                     <div class="fator-actions">
@@ -484,19 +501,60 @@ async function carregarListaFatores() {
                         <button class="btn-action btn-delete" onclick="eliminarFator(${f.id})">✕</button>
                     </div>
                 </div>
-            `).join('')}
+            `}).join('')}
         </div>
     `;
 }
 
 function abrirModalCriarFator() {
-    document.getElementById('form-fator').reset();
-    document.getElementById('fator-id').value = '';
-    document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
-    document.getElementById('entidade-select-group').style.display = 'none';
-    document.getElementById('fator-escopo').value = 'global';
-    document.getElementById('fator-escopo').disabled = false;
-    document.getElementById('modal-fator').classList.add('open');
+    const subcatId = document.getElementById('prod-subcat-id').value;
+    const produtoId = document.getElementById('prod-id').value;
+    const produtoNome = document.getElementById('prod-nome').value || 'Novo Produto';
+    
+    if (subcatId && subcatId !== '') {
+        fetch(`api/api.php?acao=listar_estrutura`)
+            .then(res => res.json())
+            .then(categorias => {
+                let subcatNome = '';
+                let catId = null;
+                let catNome = '';
+                
+                for (let cat of categorias) {
+                    for (let sub of cat.subcategorias) {
+                        if (sub.id == subcatId) {
+                            subcatNome = sub.nome;
+                            catId = cat.id;
+                            catNome = cat.nome;
+                            break;
+                        }
+                    }
+                }
+                
+                contextoAtual = {
+                    subcategoria_id: subcatId,
+                    subcategoria_nome: subcatNome,
+                    categoria_id: catId,
+                    categoria_nome: catNome,
+                    produto_id: produtoId || 'novo',
+                    produto_nome: produtoNome
+                };
+                
+                document.getElementById('form-fator').reset();
+                document.getElementById('fator-id').value = '';
+                document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
+                document.getElementById('entidade-select-group').style.display = 'none';
+                document.getElementById('fator-escopo').value = 'subcategoria';
+                document.getElementById('modal-fator').classList.add('open');
+            });
+    } else {
+        contextoAtual = null;
+        document.getElementById('form-fator').reset();
+        document.getElementById('fator-id').value = '';
+        document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
+        document.getElementById('entidade-select-group').style.display = 'none';
+        document.getElementById('fator-escopo').value = 'global';
+        document.getElementById('modal-fator').classList.add('open');
+    }
 }
 
 async function abrirModalEditarFator(id) {
@@ -511,9 +569,11 @@ async function abrirModalEditarFator(id) {
     document.getElementById('fator-nome').value = fator.nome;
     document.getElementById('fator-escopo').value = fator.escopo;
     document.getElementById('modal-fator-titulo').innerText = 'Editar Fator';
+    contextoAtual = null;
     
     if (fator.escopo !== 'global' && fator.entidade_id) {
         await carregarEntidadeSelect(fator.escopo, fator.entidade_id);
+        document.getElementById('entidade-select-group').style.display = 'block';
     } else {
         document.getElementById('entidade-select-group').style.display = 'none';
     }
@@ -524,8 +584,11 @@ async function abrirModalEditarFator(id) {
 async function mudarEscopoFator() {
     const escopo = document.getElementById('fator-escopo').value;
     const entidadeGroup = document.getElementById('entidade-select-group');
-    const entidadeSelect = document.getElementById('fator-entidade-id');
-    const entidadeLabel = document.getElementById('entidade-label');
+    
+    if (contextoAtual && escopo !== 'global') {
+        entidadeGroup.style.display = 'none';
+        return;
+    }
     
     if (escopo === 'global') {
         entidadeGroup.style.display = 'none';
@@ -533,7 +596,12 @@ async function mudarEscopoFator() {
     }
     
     entidadeGroup.style.display = 'block';
-    entidadeSelect.disabled = false;
+    await carregarEntidadeOptions(escopo);
+}
+
+async function carregarEntidadeOptions(escopo) {
+    const entidadeSelect = document.getElementById('fator-entidade-id');
+    const entidadeLabel = document.getElementById('entidade-label');
     
     if (escopo === 'categoria') {
         entidadeLabel.innerText = 'Selecionar Categoria:';
@@ -557,12 +625,8 @@ async function mudarEscopoFator() {
 }
 
 async function carregarEntidadeSelect(escopo, entidadeId) {
-    const entidadeGroup = document.getElementById('entidade-select-group');
     const entidadeSelect = document.getElementById('fator-entidade-id');
     const entidadeLabel = document.getElementById('entidade-label');
-    
-    entidadeGroup.style.display = 'block';
-    entidadeSelect.disabled = false;
     
     if (escopo === 'categoria') {
         entidadeLabel.innerText = 'Selecionar Categoria:';
@@ -592,10 +656,27 @@ async function guardarFator(e) {
     e.preventDefault();
     
     const nome = document.getElementById('fator-nome').value;
-    const escopo = document.getElementById('fator-escopo').value;
+    let escopo = document.getElementById('fator-escopo').value;
     let entidade_id = null;
     
-    if (escopo !== 'global') {
+    if (contextoAtual && escopo !== 'global') {
+        switch (escopo) {
+            case 'categoria':
+                entidade_id = contextoAtual.categoria_id;
+                break;
+            case 'subcategoria':
+                entidade_id = contextoAtual.subcategoria_id;
+                break;
+            case 'produto':
+                if (!contextoAtual.produto_id || contextoAtual.produto_id === 'novo') {
+                    escopo = 'produto_pendente';
+                    entidade_id = null;
+                } else {
+                    entidade_id = contextoAtual.produto_id;
+                }
+                break;
+        }
+    } else if (escopo !== 'global') {
         entidade_id = document.getElementById('fator-entidade-id').value;
         if (!entidade_id) {
             alert('Por favor, selecione uma entidade.');
@@ -630,6 +711,8 @@ async function guardarFator(e) {
         if (subcatId) {
             await carregarFatoresDisponiveis(subcatId, produtoId || null);
         }
+        
+        contextoAtual = null;
     }
 }
 
@@ -671,21 +754,374 @@ async function carregarFatoresDisponiveis(subcategoriaId, produtoId = null) {
         const div = document.createElement('div');
         div.className = 'checkbox-item';
         
-        let escopoTexto = '';
-        if (fator.escopo === 'categoria') {
-            escopoTexto = ' (categoria)';
-        } else if (fator.escopo === 'subcategoria') {
-            escopoTexto = ' (subcategoria)';
-        } else if (fator.escopo === 'produto') {
-            escopoTexto = ' (produto)';
-        }
+        let aplicaTexto = '';
+        if (fator.escopo === 'global') aplicaTexto = ' (global)';
+        else if (fator.escopo === 'categoria') aplicaTexto = ' (categoria)';
+        else if (fator.escopo === 'subcategoria') aplicaTexto = ' (subcategoria)';
+        else if (fator.escopo === 'produto') aplicaTexto = ' (produto)';
+        else if (fator.escopo === 'produto_pendente') aplicaTexto = ' (pendente)';
         
         div.innerHTML = `
             <input type="checkbox" class="chk-fator" value="${fator.id}" 
                    data-nome="${fator.nome}" 
                    onchange="gerarMatriz()">
-            <label>${escapeHtml(fator.nome)}<span style="color:#64748b; font-size:0.7rem;">${escopoTexto}</span></label>
+            <label>${escapeHtml(fator.nome)}<span style="color:#64748b; font-size:0.7rem;">${aplicaTexto}</span></label>
         `;
         container.appendChild(div);
     });
+}
+
+// ==================== ATUALIZAR PRECOS ====================
+
+async function abrirModalAtualizarPrecos() {
+    document.getElementById('modal-atualizar-precos').classList.add('open');
+    await carregarArvoreSelecao();
+}
+
+async function carregarArvoreSelecao() {
+    const container = document.getElementById('arvore-selecao');
+    container.innerHTML = '<div class="loading">A carregar estrutura...</div>';
+    
+    try {
+        const res = await fetch('api/api.php?acao=listar_estrutura_completa');
+        const dados = await res.json();
+        
+        if (Array.isArray(dados)) {
+            estruturaSelecao = dados;
+        } else {
+            estruturaSelecao = [];
+            console.error('Dados recebidos nao sao um array:', dados);
+        }
+        
+        selecionados = {
+            categorias: new Set(),
+            subcategorias: new Set(),
+            produtos: new Set()
+        };
+        
+        renderizarArvoreSelecao();
+    } catch (error) {
+        console.error('Erro ao carregar estrutura:', error);
+        container.innerHTML = '<div class="loading">Erro ao carregar estrutura. Tente novamente.</div>';
+    }
+}
+
+function renderizarArvoreSelecao() {
+    const container = document.getElementById('arvore-selecao');
+    
+    if (!estruturaSelecao || estruturaSelecao.length === 0) {
+        container.innerHTML = '<div class="loading">Nenhuma categoria encontrada.</div>';
+        return;
+    }
+    
+    let html = '';
+    
+    estruturaSelecao.forEach(categoria => {
+        const categoriaId = `cat_${categoria.id}`;
+        const categoriaChecked = selecionados.categorias.has(categoria.id);
+        
+        html += `
+            <div class="tree-item-categoria">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="${categoriaId}" data-tipo="categoria" data-id="${categoria.id}" 
+                           onchange="toggleCategoria(this, ${categoria.id})" ${categoriaChecked ? 'checked' : ''}>
+                    <strong>Categoria: ${escapeHtml(categoria.nome)}</strong>
+                    <span class="selected-count" id="count_${categoriaId}"></span>
+                </label>
+        `;
+        
+        if (categoria.subcategorias && categoria.subcategorias.length > 0) {
+            html += `<div class="tree-item">`;
+            categoria.subcategorias.forEach(subcategoria => {
+                const subcategoriaId = `sub_${subcategoria.id}`;
+                const subcategoriaChecked = selecionados.subcategorias.has(subcategoria.id);
+                
+                html += `
+                    <div class="tree-item-subcategoria">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="${subcategoriaId}" data-tipo="subcategoria" data-id="${subcategoria.id}" 
+                                   data-categoria-id="${categoria.id}" onchange="toggleSubcategoria(this, ${subcategoria.id}, ${categoria.id})" ${subcategoriaChecked ? 'checked' : ''}>
+                            <strong>Subcategoria: ${escapeHtml(subcategoria.nome)}</strong>
+                            <span class="selected-count" id="count_${subcategoriaId}"></span>
+                        </label>
+                `;
+                
+                if (subcategoria.produtos && subcategoria.produtos.length > 0) {
+                    html += `<div class="tree-item">`;
+                    subcategoria.produtos.forEach(produto => {
+                        const produtoId = `prod_${produto.id}`;
+                        const produtoChecked = selecionados.produtos.has(produto.id);
+                        
+                        let precoTexto = '';
+                        if (produto.tipo_preco === 'fixo') {
+                            precoTexto = produto.preco_fixo + ' €';
+                        } else {
+                            precoTexto = 'Preco Dinamico';
+                        }
+                        
+                        html += `
+                            <div class="tree-item-produto">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="${produtoId}" data-tipo="produto" data-id="${produto.id}" 
+                                           data-subcategoria-id="${subcategoria.id}" onchange="toggleProduto(this, ${produto.id}, ${subcategoria.id})" ${produtoChecked ? 'checked' : ''}>
+                                    Produto: ${escapeHtml(produto.nome)} - <span style="color:#2563eb;">${precoTexto}</span>
+                                </label>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                }
+                
+                html += `</div>`;
+            });
+            html += `</div>`;
+        }
+        
+        html += `</div>`;
+    });
+    
+    container.innerHTML = html;
+    atualizarContadores();
+}
+
+function toggleCategoria(checkbox, categoriaId) {
+    if (checkbox.checked) {
+        selecionados.categorias.add(categoriaId);
+        const categoria = estruturaSelecao.find(c => c.id == categoriaId);
+        if (categoria && categoria.subcategorias) {
+            categoria.subcategorias.forEach(sub => {
+                selecionados.subcategorias.add(sub.id);
+                const subCheckbox = document.getElementById(`sub_${sub.id}`);
+                if (subCheckbox) subCheckbox.checked = true;
+                
+                if (sub.produtos) {
+                    sub.produtos.forEach(prod => {
+                        selecionados.produtos.add(prod.id);
+                        const prodCheckbox = document.getElementById(`prod_${prod.id}`);
+                        if (prodCheckbox) prodCheckbox.checked = true;
+                    });
+                }
+            });
+        }
+    } else {
+        selecionados.categorias.delete(categoriaId);
+        const categoria = estruturaSelecao.find(c => c.id == categoriaId);
+        if (categoria && categoria.subcategorias) {
+            categoria.subcategorias.forEach(sub => {
+                selecionados.subcategorias.delete(sub.id);
+                const subCheckbox = document.getElementById(`sub_${sub.id}`);
+                if (subCheckbox) subCheckbox.checked = false;
+                
+                if (sub.produtos) {
+                    sub.produtos.forEach(prod => {
+                        selecionados.produtos.delete(prod.id);
+                        const prodCheckbox = document.getElementById(`prod_${prod.id}`);
+                        if (prodCheckbox) prodCheckbox.checked = false;
+                    });
+                }
+            });
+        }
+    }
+    atualizarContadores();
+}
+
+function toggleSubcategoria(checkbox, subcategoriaId, categoriaId) {
+    if (checkbox.checked) {
+        selecionados.subcategorias.add(subcategoriaId);
+        if (!selecionados.categorias.has(categoriaId)) {
+            const catCheckbox = document.getElementById(`cat_${categoriaId}`);
+            if (catCheckbox) catCheckbox.checked = true;
+            selecionados.categorias.add(categoriaId);
+        }
+        const categoria = estruturaSelecao.find(c => c.id == categoriaId);
+        if (categoria) {
+            const subcategoria = categoria.subcategorias.find(s => s.id == subcategoriaId);
+            if (subcategoria && subcategoria.produtos) {
+                subcategoria.produtos.forEach(prod => {
+                    selecionados.produtos.add(prod.id);
+                    const prodCheckbox = document.getElementById(`prod_${prod.id}`);
+                    if (prodCheckbox) prodCheckbox.checked = true;
+                });
+            }
+        }
+    } else {
+        selecionados.subcategorias.delete(subcategoriaId);
+        const categoria = estruturaSelecao.find(c => c.id == categoriaId);
+        if (categoria) {
+            const subcategoria = categoria.subcategorias.find(s => s.id == subcategoriaId);
+            if (subcategoria && subcategoria.produtos) {
+                subcategoria.produtos.forEach(prod => {
+                    selecionados.produtos.delete(prod.id);
+                    const prodCheckbox = document.getElementById(`prod_${prod.id}`);
+                    if (prodCheckbox) prodCheckbox.checked = false;
+                });
+            }
+        }
+        const categoriaData = estruturaSelecao.find(c => c.id == categoriaId);
+        if (categoriaData && categoriaData.subcategorias) {
+            const hasSubcategorias = categoriaData.subcategorias.some(sub => selecionados.subcategorias.has(sub.id));
+            if (!hasSubcategorias) {
+                selecionados.categorias.delete(categoriaId);
+                const catCheckbox = document.getElementById(`cat_${categoriaId}`);
+                if (catCheckbox) catCheckbox.checked = false;
+            }
+        }
+    }
+    atualizarContadores();
+}
+
+function toggleProduto(checkbox, produtoId, subcategoriaId) {
+    if (checkbox.checked) {
+        selecionados.produtos.add(produtoId);
+        if (!selecionados.subcategorias.has(subcategoriaId)) {
+            const subCheckbox = document.getElementById(`sub_${subcategoriaId}`);
+            if (subCheckbox) subCheckbox.checked = true;
+            selecionados.subcategorias.add(subcategoriaId);
+            
+            for (let cat of estruturaSelecao) {
+                const sub = cat.subcategorias ? cat.subcategorias.find(s => s.id == subcategoriaId) : null;
+                if (sub && !selecionados.categorias.has(cat.id)) {
+                    const catCheckbox = document.getElementById(`cat_${cat.id}`);
+                    if (catCheckbox) catCheckbox.checked = true;
+                    selecionados.categorias.add(cat.id);
+                    break;
+                }
+            }
+        }
+    } else {
+        selecionados.produtos.delete(produtoId);
+        let subcategoriaHasProdutos = false;
+        for (let cat of estruturaSelecao) {
+            const sub = cat.subcategorias ? cat.subcategorias.find(s => s.id == subcategoriaId) : null;
+            if (sub && sub.produtos) {
+                subcategoriaHasProdutos = sub.produtos.some(p => selecionados.produtos.has(p.id));
+                break;
+            }
+        }
+        if (!subcategoriaHasProdutos) {
+            selecionados.subcategorias.delete(subcategoriaId);
+            const subCheckbox = document.getElementById(`sub_${subcategoriaId}`);
+            if (subCheckbox) subCheckbox.checked = false;
+            
+            for (let cat of estruturaSelecao) {
+                const hasSubcategorias = cat.subcategorias ? cat.subcategorias.some(sub => selecionados.subcategorias.has(sub.id)) : false;
+                if (!hasSubcategorias && selecionados.categorias.has(cat.id)) {
+                    selecionados.categorias.delete(cat.id);
+                    const catCheckbox = document.getElementById(`cat_${cat.id}`);
+                    if (catCheckbox) catCheckbox.checked = false;
+                }
+            }
+        }
+    }
+    atualizarContadores();
+}
+
+function atualizarContadores() {
+    if (!estruturaSelecao) return;
+    
+    estruturaSelecao.forEach(categoria => {
+        const countSpan = document.getElementById(`count_cat_${categoria.id}`);
+        if (countSpan) {
+            let count = 0;
+            if (categoria.subcategorias) {
+                categoria.subcategorias.forEach(sub => {
+                    if (selecionados.subcategorias.has(sub.id)) count++;
+                    if (sub.produtos) {
+                        sub.produtos.forEach(prod => {
+                            if (selecionados.produtos.has(prod.id)) count++;
+                        });
+                    }
+                });
+            }
+            countSpan.textContent = count > 0 ? `(${count} selecionados)` : '';
+        }
+    });
+    
+    estruturaSelecao.forEach(categoria => {
+        if (categoria.subcategorias) {
+            categoria.subcategorias.forEach(sub => {
+                const countSpan = document.getElementById(`count_sub_${sub.id}`);
+                if (countSpan && sub.produtos) {
+                    const count = sub.produtos.filter(p => selecionados.produtos.has(p.id)).length;
+                    countSpan.textContent = count > 0 ? `(${count} produtos selecionados)` : '';
+                }
+            });
+        }
+    });
+}
+
+function selecionarTodos() {
+    if (!estruturaSelecao) return;
+    
+    estruturaSelecao.forEach(categoria => {
+        selecionados.categorias.add(categoria.id);
+        if (categoria.subcategorias) {
+            categoria.subcategorias.forEach(sub => {
+                selecionados.subcategorias.add(sub.id);
+                if (sub.produtos) {
+                    sub.produtos.forEach(prod => {
+                        selecionados.produtos.add(prod.id);
+                    });
+                }
+            });
+        }
+    });
+    renderizarArvoreSelecao();
+}
+
+function desmarcarTodos() {
+    selecionados = {
+        categorias: new Set(),
+        subcategorias: new Set(),
+        produtos: new Set()
+    };
+    renderizarArvoreSelecao();
+}
+
+async function aplicarAumentoPrecos() {
+    const percentagem = parseFloat(document.getElementById('percentagem-aumento').value);
+    
+    if (isNaN(percentagem)) {
+        alert('Por favor, insira uma percentagem valida.');
+        return;
+    }
+    
+    if (selecionados.produtos.size === 0 && selecionados.subcategorias.size === 0 && selecionados.categorias.size === 0) {
+        alert('Por favor, selecione pelo menos um item para atualizar.');
+        return;
+    }
+    
+    const confirmMsg = `Tem certeza que deseja aplicar ${percentagem > 0 ? '+' : ''}${percentagem}% de ${percentagem > 0 ? 'aumento' : 'diminuicao'} nos precos dos itens selecionados?`;
+    if (!confirm(confirmMsg)) return;
+    
+    const dados = {
+        percentagem: percentagem,
+        categorias: Array.from(selecionados.categorias),
+        subcategorias: Array.from(selecionados.subcategorias),
+        produtos: Array.from(selecionados.produtos)
+    };
+    
+    try {
+        const res = await fetch('api/api.php?acao=atualizar_precos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dados)
+        });
+        
+        const result = await res.json();
+        
+        if (result.sucesso) {
+            alert(`Precos atualizados com sucesso!\n\nProdutos afetados: ${result.produtos_afetados}\nVariantes afetadas: ${result.variantes_afetadas}`);
+            fecharModais();
+            
+            if (subcatAtiva) {
+                carregarProdutosAdmin(subcatAtiva);
+            }
+        } else {
+            alert('Erro ao atualizar precos: ' + (result.erro || 'Tente novamente'));
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao comunicar com o servidor.');
+    }
 }
