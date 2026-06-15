@@ -69,6 +69,8 @@
         .btn-primary:hover { background: #1d4ed8; }
         .btn-secondary { background: #64748b; color: white; }
         .btn-secondary:hover { background: #475569; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
         .checkbox-group { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
         .checkbox-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; }
         
@@ -175,19 +177,44 @@
             font-size: 0.85rem;
             color: #475569;
         }
+        
+        .fator-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .fator-row:hover {
+            background: #f8fafc;
+        }
+        .fator-info {
+            flex: 1;
+        }
+        .fator-nome {
+            font-weight: 600;
+        }
+        .fator-detalhes {
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        .fator-actions {
+            display: flex;
+            gap: 8px;
+        }
     </style>
 </head>
 <body>
 
 <header style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: #ffffff; border-bottom: 1px solid #e2e8f0; height: 80px;">
     <div class="logo-area" style="flex: 1;">
-        <img src="image/Logo.png" alt="Berci Gráfica" style="height: 50px; width: auto;">
+        <img src="image/Logo.png" alt="Berci Grafica" style="height: 50px; width: auto;">
     </div>
     <div style="flex: 2; text-align: center;">
-        <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a;">Modo Edição</h1>
+        <h1 style="font-size: 2rem; font-weight: 800; color: #0f172a;">Modo Edicao</h1>
     </div>
     <div style="flex: 1; display: flex; justify-content: flex-end;">
-        <a href="index.html" style="text-decoration: none; color: #475569; padding: 0.6rem 1.2rem; border-radius: 6px; background: #f1f5f9;">Sair do Modo Edição →</a>
+        <a href="index.html" style="text-decoration: none; color: #475569; padding: 0.6rem 1.2rem; border-radius: 6px; background: #f1f5f9;">Sair do Modo Edicao →</a>
     </div>
 </header>
 
@@ -268,9 +295,8 @@
             </div>
             
             <div id="bloco-preco-variavel" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-                    <label style="font-weight: 700;">Fatores para este produto:</label>
-                    <button type="button" class="btn btn-secondary" onclick="abrirModalFatorFromProduto()" style="padding: 4px 12px; font-size: 0.85rem;">+ Criar Fator</button>
+                <div style="margin-bottom: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="abrirGerirFatores()">Gerir Fatores</button>
                 </div>
                 <div id="fatores-checkboxes" class="checkbox-group"></div>
                 <div id="inputs-valores-fatores"></div>
@@ -285,13 +311,23 @@
     </div>
 </div>
 
-<!-- Modal Fator -->
+<!-- Modal Gerir Fatores -->
+<div id="modal-gerir-fatores" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+        <button class="close-modal" onclick="fecharModais()">✕</button>
+        <h2>Gerir Fatores</h2>
+        <div style="margin-bottom: 1rem;">
+            <button class="btn btn-primary" onclick="abrirModalCriarFator()">+ Novo Fator</button>
+        </div>
+        <div id="lista-fatores-container"></div>
+    </div>
+</div>
+
+<!-- Modal Criar/Editar Fator -->
 <div id="modal-fator" class="modal">
     <div class="modal-content">
         <button class="close-modal" onclick="fecharModais()">✕</button>
         <h2 id="modal-fator-titulo">Novo Fator</h2>
-        
-        <div id="fator-info" class="info-box"></div>
         
         <form id="form-fator" onsubmit="guardarFator(event)">
             <input type="hidden" id="fator-id">
@@ -302,16 +338,19 @@
             </div>
             
             <div class="form-group">
-                <label>Opcoes (separadas por virgula)</label>
-                <input type="text" id="fator-opcoes" class="form-control" required placeholder="Ex: Pequeno, Medio, Grande">
+                <label>Escopo</label>
+                <select id="fator-escopo" class="form-control" onchange="mudarEscopoFator()">
+                    <option value="global">Global (todos os produtos)</option>
+                    <option value="categoria">Categoria (apenas nesta categoria)</option>
+                    <option value="subcategoria">Subcategoria (apenas nesta subcategoria)</option>
+                    <option value="produto">Produto (apenas neste produto)</option>
+                </select>
             </div>
             
-            <div class="form-group">
-                <label>Escopo</label>
-                <select id="fator-escopo" class="form-control">
-                    <option value="subcategoria">Subcategoria (apenas para esta subcategoria)</option>
-                    <option value="categoria">Categoria (apenas para esta categoria)</option>
-                    <option value="produto">Produto (apenas para este produto)</option>
+            <div class="form-group" id="entidade-select-group" style="display: none;">
+                <label id="entidade-label">Selecionar Categoria</label>
+                <select id="fator-entidade-id" class="form-control">
+                    <option value="">Selecione...</option>
                 </select>
             </div>
             
@@ -322,4 +361,4 @@
 
 <script src="assets/js/admin.js"></script>
 </body>
-</html>
+</html> 

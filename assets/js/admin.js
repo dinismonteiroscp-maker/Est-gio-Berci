@@ -1,14 +1,13 @@
-// ==================== VARIÁVEIS GLOBAIS ====================
+// ==================== VARIAVEIS GLOBAIS ====================
 let subcatAtiva = null;
 let estruturaLocal = [];
-let contextoAtual = null;
 
-// ==================== INICIALIZAÇÃO ====================
+// ==================== INICIALIZACAO ====================
 document.addEventListener("DOMContentLoaded", () => {
     carregarEstruturaAdmin();
 });
 
-// ==================== UTILITÁRIOS ====================
+// ==================== UTILITARIOS ====================
 function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -235,16 +234,13 @@ function gerarMatriz() {
     
     chks.forEach(chk => {
         const fatorNome = chk.dataset.nome;
-        const opcoes = JSON.parse(chk.dataset.opcoes);
         
         const div = document.createElement('div');
         div.className = "fator-input-box";
         div.innerHTML = `
-            <label style="display:block; margin-bottom:0.4rem;">${fatorNome}:</label>
-            <select class="input-valores-fator" data-fator-nome="${fatorNome}" onchange="renderizarTabelaCombinatoria()">
-                ${opcoes.map(op => `<option value="${op}">${op}</option>`).join('')}
-            </select>
-            <button type="button" class="btn-dashed" style="margin-top:5px;" onclick="adicionarOpcao(this)">+ Adicionar opcao</button>
+            <label style="display:block; margin-bottom:0.4rem;">${fatorNome} (valores separados por virgula):</label>
+            <input type="text" class="input-valores-fator" data-fator-nome="${fatorNome}" placeholder="Ex: Pequeno, Medio, Grande" oninput="renderizarTabelaCombinatoria()">
+            <button type="button" class="btn-dashed" style="margin-top:5px;" onclick="adicionarValor(this)">+ Adicionar valor</button>
         `;
         containerInputs.appendChild(div);
     });
@@ -252,15 +248,17 @@ function gerarMatriz() {
     renderizarTabelaCombinatoria();
 }
 
-function adicionarOpcao(btn) {
-    const select = btn.previousElementSibling;
-    const novaOpcao = prompt("Nova opcao:");
-    if (novaOpcao) {
-        const option = document.createElement('option');
-        option.value = novaOpcao;
-        option.text = novaOpcao;
-        select.appendChild(option);
-        renderizarTabelaCombinatoria();
+function adicionarValor(btn) {
+    const input = btn.previousElementSibling;
+    const novoValor = prompt("Novo valor:");
+    if (novoValor) {
+        const valorAtual = input.value;
+        if (valorAtual) {
+            input.value = valorAtual + ', ' + novoValor;
+        } else {
+            input.value = novoValor;
+        }
+        input.dispatchEvent(new Event('input'));
     }
 }
 
@@ -271,7 +269,7 @@ function renderizarTabelaCombinatoria() {
     let nomesFatores = [];
 
     inputs.forEach(inp => {
-        const valores = Array.from(inp.options).map(opt => opt.value);
+        let valores = inp.value.split(',').map(s => s.trim()).filter(s => s !== "");
         if (valores.length > 0) {
             listas.push(valores);
             nomesFatores.push(inp.dataset.fatorNome);
@@ -357,22 +355,8 @@ async function guardarProduto(e) {
     const result = await res.json();
     
     if (result.sucesso) {
-        const produtoId = result.produto_id;
-        const produtoNome = document.getElementById('prod-nome').value;
-        
-        await fetch('api/api.php?acao=converter_fatores_pendentes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                produto_id: produtoId, 
-                produto_nome: produtoNome 
-            })
-        });
-        
         fecharModais();
         if (subcatAtiva) carregarProdutosAdmin(subcatAtiva);
-    } else {
-        alert('Erro: ' + (result.erro || 'Tente novamente'));
     }
 }
 
@@ -434,14 +418,7 @@ function abrirModalEditarProduto(prodStringEncoded) {
                                 return atributos[nome];
                             }))];
                             if (valoresUnicos.length > 0 && valoresUnicos[0]) {
-                                valoresUnicos.forEach(val => {
-                                    if (!Array.from(input.options).some(opt => opt.value === val)) {
-                                        const opt = document.createElement('option');
-                                        opt.value = val;
-                                        opt.text = val;
-                                        input.appendChild(opt);
-                                    }
-                                });
+                                input.value = valoresUnicos.join(', ');
                             }
                         });
                         renderizarTabelaCombinatoria();
@@ -475,104 +452,155 @@ function abrirModalEditarProduto(prodStringEncoded) {
 
 // ==================== FATORES ====================
 
-function abrirModalFatorFromProduto() {
-    const subcatId = document.getElementById('prod-subcat-id').value;
-    if (!subcatId) {
-        alert('Selecione uma subcategoria primeiro.');
+async function abrirGerirFatores() {
+    await carregarListaFatores();
+    document.getElementById('modal-gerir-fatores').classList.add('open');
+}
+
+async function carregarListaFatores() {
+    const res = await fetch('api/api.php?acao=listar_todos_fatores');
+    const fatores = await res.json();
+    
+    const container = document.getElementById('lista-fatores-container');
+    if (!container) return;
+    
+    if (fatores.length === 0) {
+        container.innerHTML = '<div class="info-box">Nenhum fator criado ainda.</div>';
         return;
     }
     
-    const produtoId = document.getElementById('prod-id').value;
-    const produtoNome = document.getElementById('prod-nome').value || 'Novo Produto (ainda não guardado)';
+    container.innerHTML = `
+        <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+            ${fatores.map(f => `
+                <div class="fator-row">
+                    <div class="fator-info">
+                        <div class="fator-nome">${escapeHtml(f.nome)}</div>
+                        <div class="fator-detalhes">
+                            Escopo: ${f.escopo}${f.entidade_nome ? ' - ' + f.entidade_nome : ''}
+                        </div>
+                    </div>
+                    <div class="fator-actions">
+                        <button class="btn-action btn-edit" onclick="abrirModalEditarFator(${f.id})">✎</button>
+                        <button class="btn-action btn-delete" onclick="eliminarFator(${f.id})">✕</button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}
+
+function abrirModalCriarFator() {
+    document.getElementById('form-fator').reset();
+    document.getElementById('fator-id').value = '';
+    document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
+    document.getElementById('entidade-select-group').style.display = 'none';
+    document.getElementById('fator-escopo').value = 'global';
+    document.getElementById('fator-escopo').disabled = false;
+    document.getElementById('modal-fator').classList.add('open');
+}
+
+async function abrirModalEditarFator(id) {
+    const res = await fetch('api/api.php?acao=listar_todos_fatores');
+    const fatores = await res.json();
+    const fator = fatores.find(f => f.id == id);
     
-    fetch(`api/api.php?acao=listar_estrutura`)
-        .then(res => res.json())
-        .then(categorias => {
-            let subcatNome = '';
-            let catId = null;
-            let catNome = '';
-            
-            for (let cat of categorias) {
-                for (let sub of cat.subcategorias) {
-                    if (sub.id == subcatId) {
-                        subcatNome = sub.nome;
-                        catId = cat.id;
-                        catNome = cat.nome;
-                        break;
-                    }
-                }
-            }
-            
-            contextoAtual = {
-                subcategoria_id: subcatId,
-                subcategoria_nome: subcatNome,
-                categoria_id: catId,
-                categoria_nome: catNome,
-                produto_id: produtoId || 'novo',
-                produto_nome: produtoNome
-            };
-            
-            const infoDiv = document.getElementById('fator-info');
-            infoDiv.innerHTML = `
-                <strong>Contexto atual:</strong><br>
-                📁 Categoria: ${catNome}<br>
-                📂 Subcategoria: ${subcatNome}
-                ${produtoId ? `<br>📄 Produto: ${produtoNome}` : '<br>📄 Produto: (será criado depois)'}
-            `;
-            
-            document.getElementById('form-fator').reset();
-            document.getElementById('fator-id').value = '';
-            document.getElementById('fator-escopo').value = 'subcategoria';
-            document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
-            document.getElementById('modal-fator').classList.add('open');
-        });
+    if (!fator) return;
+    
+    document.getElementById('form-fator').reset();
+    document.getElementById('fator-id').value = fator.id;
+    document.getElementById('fator-nome').value = fator.nome;
+    document.getElementById('fator-escopo').value = fator.escopo;
+    document.getElementById('modal-fator-titulo').innerText = 'Editar Fator';
+    
+    if (fator.escopo !== 'global' && fator.entidade_id) {
+        await carregarEntidadeSelect(fator.escopo, fator.entidade_id);
+    } else {
+        document.getElementById('entidade-select-group').style.display = 'none';
+    }
+    
+    document.getElementById('modal-fator').classList.add('open');
+}
+
+async function mudarEscopoFator() {
+    const escopo = document.getElementById('fator-escopo').value;
+    const entidadeGroup = document.getElementById('entidade-select-group');
+    const entidadeSelect = document.getElementById('fator-entidade-id');
+    const entidadeLabel = document.getElementById('entidade-label');
+    
+    if (escopo === 'global') {
+        entidadeGroup.style.display = 'none';
+        return;
+    }
+    
+    entidadeGroup.style.display = 'block';
+    entidadeSelect.disabled = false;
+    
+    if (escopo === 'categoria') {
+        entidadeLabel.innerText = 'Selecionar Categoria:';
+        const res = await fetch('api/api.php?acao=listar_categorias_simples');
+        const categorias = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+    } else if (escopo === 'subcategoria') {
+        entidadeLabel.innerText = 'Selecionar Subcategoria:';
+        const res = await fetch('api/api.php?acao=listar_subcategorias_simples');
+        const subcategorias = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            subcategorias.map(s => `<option value="${s.id}">${escapeHtml(s.categoria_nome)} > ${escapeHtml(s.nome)}</option>`).join('');
+    } else if (escopo === 'produto') {
+        entidadeLabel.innerText = 'Selecionar Produto:';
+        const res = await fetch('api/api.php?acao=listar_produtos_simples');
+        const produtos = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            produtos.map(p => `<option value="${p.id}">${escapeHtml(p.categoria_nome)} > ${escapeHtml(p.subcategoria_nome)} > ${escapeHtml(p.nome)}</option>`).join('');
+    }
+}
+
+async function carregarEntidadeSelect(escopo, entidadeId) {
+    const entidadeGroup = document.getElementById('entidade-select-group');
+    const entidadeSelect = document.getElementById('fator-entidade-id');
+    const entidadeLabel = document.getElementById('entidade-label');
+    
+    entidadeGroup.style.display = 'block';
+    entidadeSelect.disabled = false;
+    
+    if (escopo === 'categoria') {
+        entidadeLabel.innerText = 'Selecionar Categoria:';
+        const res = await fetch('api/api.php?acao=listar_categorias_simples');
+        const categorias = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
+        entidadeSelect.value = entidadeId;
+    } else if (escopo === 'subcategoria') {
+        entidadeLabel.innerText = 'Selecionar Subcategoria:';
+        const res = await fetch('api/api.php?acao=listar_subcategorias_simples');
+        const subcategorias = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            subcategorias.map(s => `<option value="${s.id}">${escapeHtml(s.categoria_nome)} > ${escapeHtml(s.nome)}</option>`).join('');
+        entidadeSelect.value = entidadeId;
+    } else if (escopo === 'produto') {
+        entidadeLabel.innerText = 'Selecionar Produto:';
+        const res = await fetch('api/api.php?acao=listar_produtos_simples');
+        const produtos = await res.json();
+        entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
+            produtos.map(p => `<option value="${p.id}">${escapeHtml(p.categoria_nome)} > ${escapeHtml(p.subcategoria_nome)} > ${escapeHtml(p.nome)}</option>`).join('');
+        entidadeSelect.value = entidadeId;
+    }
 }
 
 async function guardarFator(e) {
     e.preventDefault();
     
-    const opcoesStr = document.getElementById('fator-opcoes').value;
-    const opcoes = opcoesStr.split(',').map(s => s.trim()).filter(s => s !== '');
-    
-    if (opcoes.length === 0) {
-        alert('Por favor, insira pelo menos uma opcao.');
-        return;
-    }
-    
     const nome = document.getElementById('fator-nome').value;
-    if (!nome) {
-        alert('Por favor, insira o nome do fator.');
-        return;
-    }
-    
-    let escopo = document.getElementById('fator-escopo').value;
+    const escopo = document.getElementById('fator-escopo').value;
     let entidade_id = null;
-    let entidade_nome = '';
     
-    if (!contextoAtual) {
-        alert('Erro: contexto não definido.');
-        return;
-    }
-    
-    switch (escopo) {
-        case 'categoria':
-            entidade_id = contextoAtual.categoria_id;
-            entidade_nome = contextoAtual.categoria_nome;
-            break;
-        case 'subcategoria':
-            entidade_id = contextoAtual.subcategoria_id;
-            entidade_nome = contextoAtual.subcategoria_nome;
-            break;
-        case 'produto':
-            if (!contextoAtual.produto_id || contextoAtual.produto_id === 'novo') {
-                escopo = 'produto_pendente';
-                entidade_id = null;
-                entidade_nome = contextoAtual.produto_nome || 'Produto (será associado)';
-            } else {
-                entidade_id = contextoAtual.produto_id;
-                entidade_nome = contextoAtual.produto_nome;
-            }
-            break;
+    if (escopo !== 'global') {
+        entidade_id = document.getElementById('fator-entidade-id').value;
+        if (!entidade_id) {
+            alert('Por favor, selecione uma entidade.');
+            return;
+        }
     }
     
     const fator = {
@@ -581,7 +609,7 @@ async function guardarFator(e) {
         tipo: 'select',
         escopo: escopo,
         entidade_id: entidade_id,
-        opcoes: opcoes,
+        opcoes: [],
         obrigatorio: false,
         ordem: 0
     };
@@ -595,20 +623,28 @@ async function guardarFator(e) {
     const result = await res.json();
     if (result.sucesso) {
         fecharModais();
-        
-        let mensagem = `Fator "${nome}" guardado com sucesso!`;
-        if (escopo === 'produto_pendente') {
-            mensagem += `\n\n⚠️ Este fator será associado ao produto quando for guardado.`;
-        }
-        alert(mensagem);
+        await carregarListaFatores();
         
         const subcatId = document.getElementById('prod-subcat-id').value;
         const produtoId = document.getElementById('prod-id').value;
         if (subcatId) {
             await carregarFatoresDisponiveis(subcatId, produtoId || null);
         }
-    } else {
-        alert('Erro ao guardar fator: ' + (result.erro || 'Tente novamente'));
+    }
+}
+
+async function eliminarFator(id) {
+    if(confirm("Eliminar este fator?")) {
+        const fd = new FormData();
+        fd.append('id', id);
+        await fetch('api/api.php?acao=eliminar_fator', { method: 'POST', body: fd });
+        await carregarListaFatores();
+        
+        const subcatId = document.getElementById('prod-subcat-id').value;
+        const produtoId = document.getElementById('prod-id').value;
+        if (subcatId) {
+            await carregarFatoresDisponiveis(subcatId, produtoId || null);
+        }
     }
 }
 
@@ -627,7 +663,7 @@ async function carregarFatoresDisponiveis(subcategoriaId, produtoId = null) {
     container.innerHTML = '';
     
     if (fatores.length === 0) {
-        container.innerHTML = '<div class="info-box">Nenhum fator disponivel. Clique em "+ Criar Fator" para adicionar.</div>';
+        container.innerHTML = '<div class="info-box">Nenhum fator disponivel. Clique em "Gerir Fatores" para adicionar.</div>';
         return;
     }
     
@@ -636,25 +672,19 @@ async function carregarFatoresDisponiveis(subcategoriaId, produtoId = null) {
         div.className = 'checkbox-item';
         
         let escopoTexto = '';
-        let estiloExtra = '';
-        
         if (fator.escopo === 'categoria') {
             escopoTexto = ' (categoria)';
         } else if (fator.escopo === 'subcategoria') {
             escopoTexto = ' (subcategoria)';
         } else if (fator.escopo === 'produto') {
             escopoTexto = ' (produto)';
-        } else if (fator.escopo === 'produto_pendente') {
-            escopoTexto = ' (pendente - será associado ao guardar)';
-            estiloExtra = ' style="color:#eab308;"';
         }
         
         div.innerHTML = `
             <input type="checkbox" class="chk-fator" value="${fator.id}" 
                    data-nome="${fator.nome}" 
-                   data-opcoes='${JSON.stringify(fator.opcoes)}'
                    onchange="gerarMatriz()">
-            <label${estiloExtra}>${escapeHtml(fator.nome)}<span style="color:#64748b; font-size:0.7rem;">${escopoTexto}</span></label>
+            <label>${escapeHtml(fator.nome)}<span style="color:#64748b; font-size:0.7rem;">${escopoTexto}</span></label>
         `;
         container.appendChild(div);
     });
