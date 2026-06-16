@@ -32,11 +32,11 @@ switch ($acao) {
     
     // ==================== CATEGORIAS ====================
     case 'listar_estrutura':
-        $stmt = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
+        $stmt = $pdo->query("SELECT id, nome FROM categorias ORDER BY nome ASC");
         $categorias = $stmt->fetchAll();
         
         foreach ($categorias as &$cat) {
-            $stmtSub = $pdo->prepare("SELECT * FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
+            $stmtSub = $pdo->prepare("SELECT id, nome FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
             $stmtSub->execute([$cat['id']]);
             $cat['subcategorias'] = $stmtSub->fetchAll();
         }
@@ -90,12 +90,12 @@ switch ($acao) {
     // ==================== PRODUTOS ====================
     case 'produtos':
         $subcategoria_id = $_GET['subcategoria_id'] ?? 0;
-        $stmt = $pdo->prepare("SELECT * FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
+        $stmt = $pdo->prepare("SELECT id, nome, imagem_url, tipo_preco, preco_fixo FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
         $stmt->execute([$subcategoria_id]);
         $produtos = $stmt->fetchAll();
 
         foreach ($produtos as &$prod) {
-            $stmtVar = $pdo->prepare("SELECT * FROM produto_variantes WHERE produto_id = ?");
+            $stmtVar = $pdo->prepare("SELECT id, produto_id, preco, atributos_json FROM produto_variantes WHERE produto_id = ?");
             $stmtVar->execute([$prod['id']]);
             $variantes = $stmtVar->fetchAll();
 
@@ -107,6 +107,7 @@ switch ($acao) {
                         $v = array_merge($v, $atributos);
                     }
                 }
+                unset($v['created_at']);
             }
             $prod['variantes'] = $variantes;
         }
@@ -219,7 +220,7 @@ switch ($acao) {
         if ($subcategoria_id > 0) {
             $stmt = $pdo->prepare("
                 SELECT * FROM fatores 
-                WHERE escopo = 'subcategoria' AND entidade_id = ? AND ativo = 1
+                WHERE escopo = 'subcategoria' AND entidade_id = ? AND f.ativo = 1
                 ORDER BY ordem ASC
             ");
             $stmt->execute([$subcategoria_id]);
@@ -233,11 +234,11 @@ switch ($acao) {
             }
         }
         
-        // Buscar fatores do produto (se já existir)
+        // Buscar fatores do produto
         if ($produto_id > 0) {
             $stmt = $pdo->prepare("
                 SELECT * FROM fatores 
-                WHERE escopo = 'produto' AND entidade_id = ? AND ativo = 1
+                WHERE escopo = 'produto' AND entidade_id = ? AND f.ativo = 1
                 ORDER BY ordem ASC
             ");
             $stmt->execute([$produto_id]);
@@ -251,7 +252,7 @@ switch ($acao) {
             }
         }
         
-        // Buscar fatores pendentes (produto_pendente)
+        // Buscar fatores pendentes
         $stmt = $pdo->prepare("
             SELECT * FROM fatores 
             WHERE escopo = 'produto_pendente' AND ativo = 1
@@ -336,7 +337,6 @@ switch ($acao) {
     case 'converter_fatores_pendentes':
         $data = json_decode(file_get_contents('php://input'), true);
         $produto_id = $data['produto_id'] ?? 0;
-        $produto_nome = $data['produto_nome'] ?? '';
         
         if ($produto_id > 0) {
             $stmt = $pdo->prepare("
@@ -350,6 +350,105 @@ switch ($acao) {
             echo json_encode(["sucesso" => true, "convertidos" => $count]);
         } else {
             echo json_encode(["erro" => "ID do produto inválido"]);
+        }
+        break;
+
+    // ==================== ESTRUTURA COMPLETA PARA ATUALIZAR PRECOS ====================
+    case 'listar_estrutura_completa':
+        $stmt = $pdo->query("SELECT id, nome FROM categorias ORDER BY nome ASC");
+        $categorias = $stmt->fetchAll();
+        
+        foreach ($categorias as &$cat) {
+            $stmtSub = $pdo->prepare("SELECT id, nome FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
+            $stmtSub->execute([$cat['id']]);
+            $subcategorias = $stmtSub->fetchAll();
+            
+            foreach ($subcategorias as &$sub) {
+                $stmtProd = $pdo->prepare("SELECT id, nome, tipo_preco, preco_fixo FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
+                $stmtProd->execute([$sub['id']]);
+                $sub['produtos'] = $stmtProd->fetchAll();
+            }
+            $cat['subcategorias'] = $subcategorias;
+        }
+        
+        echo json_encode($categorias);
+        break;
+
+    // ==================== ATUALIZAR PRECOS ====================
+    case 'atualizar_precos':
+        $data = json_decode(file_get_contents('php://input'), true);
+        $percentagem = floatval($data['percentagem'] ?? 0);
+        $categorias = $data['categorias'] ?? [];
+        $subcategorias = $data['subcategorias'] ?? [];
+        $produtos = $data['produtos'] ?? [];
+        
+        $produtosAfetados = 0;
+        $variantesAfetadas = 0;
+        $fator = 1 + ($percentagem / 100);
+        
+        try {
+            $pdo->beginTransaction();
+            
+            if (!empty($categorias)) {
+                $placeholders = implode(',', array_fill(0, count($categorias), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT p.id FROM produtos p
+                    JOIN subcategorias s ON p.subcategoria_id = s.id
+                    WHERE s.categoria_id IN ($placeholders)
+                ");
+                $stmt->execute($categorias);
+                $produtosCategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                $produtos = array_merge($produtos, $produtosCategoria);
+            }
+            
+            if (!empty($subcategorias)) {
+                $placeholders = implode(',', array_fill(0, count($subcategorias), '?'));
+                $stmt = $pdo->prepare("
+                    SELECT id FROM produtos WHERE subcategoria_id IN ($placeholders)
+                ");
+                $stmt->execute($subcategorias);
+                $produtosSubcategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                $produtos = array_merge($produtos, $produtosSubcategoria);
+            }
+            
+            $produtos = array_unique($produtos);
+            
+            if (!empty($produtos)) {
+                $placeholders = implode(',', array_fill(0, count($produtos), '?'));
+                
+                // Atualizar preços fixos
+                $stmt = $pdo->prepare("
+                    UPDATE produtos 
+                    SET preco_fixo = preco_fixo * ?
+                    WHERE id IN ($placeholders) AND tipo_preco = 'fixo'
+                ");
+                $params = array_merge([$fator], $produtos);
+                $stmt->execute($params);
+                $produtosAfetados = $stmt->rowCount();
+                
+                // Atualizar variantes
+                $stmt = $pdo->prepare("
+                    UPDATE produto_variantes v
+                    SET v.preco = v.preco * ?
+                    WHERE v.produto_id IN ($placeholders)
+                ");
+                $params2 = array_merge([$fator], $produtos);
+                $stmt->execute($params2);
+                $variantesAfetadas = $stmt->rowCount();
+            }
+            
+            $pdo->commit();
+            
+            echo json_encode([
+                "sucesso" => true,
+                "produtos_afetados" => $produtosAfetados,
+                "variantes_afetadas" => $variantesAfetadas,
+                "percentagem_aplicada" => $percentagem
+            ]);
+            
+        } catch (Exception $e) {
+            $pdo->rollBack();
+            echo json_encode(["erro" => $e->getMessage()]);
         }
         break;
 
@@ -379,105 +478,6 @@ switch ($acao) {
         ");
         echo json_encode($stmt->fetchAll());
         break;
-        // ==================== ESTRUTURA COMPLETA PARA ATUALIZAR PRECOS ====================
-case 'listar_estrutura_completa':
-    $stmt = $pdo->query("SELECT * FROM categorias ORDER BY nome ASC");
-    $categorias = $stmt->fetchAll();
-    
-    foreach ($categorias as &$cat) {
-        $stmtSub = $pdo->prepare("SELECT * FROM subcategorias WHERE categoria_id = ? ORDER BY nome ASC");
-        $stmtSub->execute([$cat['id']]);
-        $subcategorias = $stmtSub->fetchAll();
-        
-        foreach ($subcategorias as &$sub) {
-            $stmtProd = $pdo->prepare("SELECT id, nome, tipo_preco, preco_fixo FROM produtos WHERE subcategoria_id = ? ORDER BY nome ASC");
-            $stmtProd->execute([$sub['id']]);
-            $sub['produtos'] = $stmtProd->fetchAll();
-        }
-        $cat['subcategorias'] = $subcategorias;
-    }
-    
-    echo json_encode($categorias);
-    break;
-
-// ==================== ATUALIZAR PRECOS ====================
-// ==================== ATUALIZAR PRECOS ====================
-case 'atualizar_precos':
-    $data = json_decode(file_get_contents('php://input'), true);
-    $percentagem = floatval($data['percentagem'] ?? 0);
-    $categorias = $data['categorias'] ?? [];
-    $subcategorias = $data['subcategorias'] ?? [];
-    $produtos = $data['produtos'] ?? [];
-    
-    $produtosAfetados = 0;
-    $variantesAfetadas = 0;
-    $fator = 1 + ($percentagem / 100);
-    
-    try {
-        $pdo->beginTransaction();
-        
-        if (!empty($categorias)) {
-            $placeholders = implode(',', array_fill(0, count($categorias), '?'));
-            $stmt = $pdo->prepare("
-                SELECT p.id FROM produtos p
-                JOIN subcategorias s ON p.subcategoria_id = s.id
-                WHERE s.categoria_id IN ($placeholders)
-            ");
-            $stmt->execute($categorias);
-            $produtosCategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            $produtos = array_merge($produtos, $produtosCategoria);
-        }
-        
-        if (!empty($subcategorias)) {
-            $placeholders = implode(',', array_fill(0, count($subcategorias), '?'));
-            $stmt = $pdo->prepare("
-                SELECT id FROM produtos WHERE subcategoria_id IN ($placeholders)
-            ");
-            $stmt->execute($subcategorias);
-            $produtosSubcategoria = $stmt->fetchAll(PDO::FETCH_COLUMN);
-            $produtos = array_merge($produtos, $produtosSubcategoria);
-        }
-        
-        $produtos = array_unique($produtos);
-        
-        if (!empty($produtos)) {
-            $placeholders = implode(',', array_fill(0, count($produtos), '?'));
-            
-            // Atualizar precos fixos - removido updated_at
-            $stmt = $pdo->prepare("
-                UPDATE produtos 
-                SET preco_fixo = preco_fixo * ?
-                WHERE id IN ($placeholders) AND tipo_preco = 'fixo'
-            ");
-            $params = array_merge([$fator], $produtos);
-            $stmt->execute($params);
-            $produtosAfetados = $stmt->rowCount();
-            
-            // Atualizar variantes
-            $stmt = $pdo->prepare("
-                UPDATE produto_variantes v
-                SET v.preco = v.preco * ?
-                WHERE v.produto_id IN ($placeholders)
-            ");
-            $params2 = array_merge([$fator], $produtos);
-            $stmt->execute($params2);
-            $variantesAfetadas = $stmt->rowCount();
-        }
-        
-        $pdo->commit();
-        
-        echo json_encode([
-            "sucesso" => true,
-            "produtos_afetados" => $produtosAfetados,
-            "variantes_afetadas" => $variantesAfetadas,
-            "percentagem_aplicada" => $percentagem
-        ]);
-        
-    } catch (Exception $e) {
-        $pdo->rollBack();
-        echo json_encode(["erro" => $e->getMessage()]);
-    }
-    break;
 
     default:
         echo json_encode(["erro" => "Ação não encontrada"]);

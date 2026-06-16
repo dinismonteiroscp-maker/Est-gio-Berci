@@ -100,7 +100,8 @@ function renderizarProdutosNaGrelha(produtos) {
             prod.variantes.forEach(v => {
                 let atributos = v.atributos_json ? JSON.parse(v.atributos_json) : v;
                 Object.keys(atributos).forEach(chave => {
-                    if (chave !== 'id' && chave !== 'produto_id' && chave !== 'preco' && chave !== 'atributos_json' && atributos[chave]) {
+                    // Ignorar campos que não são fatores
+                    if (chave !== 'id' && chave !== 'produto_id' && chave !== 'preco' && chave !== 'atributos_json' && chave !== 'created_at' && atributos[chave]) {
                         if (!atributosMapeados[chave]) atributosMapeados[chave] = [];
                         if (!atributosMapeados[chave].includes(atributos[chave])) {
                             atributosMapeados[chave].push(atributos[chave]);
