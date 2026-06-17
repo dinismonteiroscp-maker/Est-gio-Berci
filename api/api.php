@@ -114,12 +114,10 @@ switch ($acao) {
     
     // ==================== CATEGORIAS ====================
     case 'listar_estrutura':
-        // ALTERADO: Ordenar por data de criação (mais antigas primeiro)
         $stmt = $pdo->query("SELECT id, nome, created_at FROM categorias ORDER BY created_at ASC");
         $categorias = $stmt->fetchAll();
         
         foreach ($categorias as &$cat) {
-            // ALTERADO: Ordenar subcategorias por data de criação (mais antigas primeiro)
             $stmtSub = $pdo->prepare("SELECT id, nome, created_at FROM subcategorias WHERE categoria_id = ? ORDER BY created_at ASC");
             $stmtSub->execute([$cat['id']]);
             $cat['subcategorias'] = $stmtSub->fetchAll();
@@ -222,7 +220,6 @@ switch ($acao) {
     // ==================== PRODUTOS ====================
     case 'produtos':
         $subcategoria_id = $_GET['subcategoria_id'] ?? 0;
-        // ALTERADO: Ordenar produtos por data de criação (mais antigos primeiro)
         $stmt = $pdo->prepare("SELECT id, nome, imagem_url, tipo_preco, preco_fixo, subcategoria_id, created_at FROM produtos WHERE subcategoria_id = ? ORDER BY created_at ASC");
         $stmt->execute([$subcategoria_id]);
         $produtos = $stmt->fetchAll();
@@ -305,13 +302,14 @@ switch ($acao) {
         $stmtDel = $pdo->prepare("DELETE FROM produto_variantes WHERE produto_id = ?");
         $stmtDel->execute([$id]);
 
-        // Salvar novas variantes
+        // Salvar novas variantes - APENAS as que têm preço preenchido
         if ($tipo_preco === 'variavel' && !empty($_POST['variantes'])) {
             $variantes = json_decode($_POST['variantes'], true);
             
             if (is_array($variantes)) {
                 foreach ($variantes as $variante) {
-                    if (isset($variante['preco']) && isset($variante['atributos'])) {
+                    // Só guarda se o preço estiver definido e não for vazio
+                    if (isset($variante['preco']) && $variante['preco'] !== '' && $variante['preco'] !== null) {
                         $precoVar = floatval($variante['preco']);
                         $atributos_json = json_encode($variante['atributos'], JSON_UNESCAPED_UNICODE);
                         
@@ -505,18 +503,15 @@ switch ($acao) {
 
     // ==================== ESTRUTURA COMPLETA PARA ATUALIZAR PRECOS ====================
     case 'listar_estrutura_completa':
-        // ALTERADO: Ordenar por data de criação (mais antigas primeiro)
         $stmt = $pdo->query("SELECT id, nome, created_at FROM categorias ORDER BY created_at ASC");
         $categorias = $stmt->fetchAll();
         
         foreach ($categorias as &$cat) {
-            // ALTERADO: Ordenar subcategorias por data de criação (mais antigas primeiro)
             $stmtSub = $pdo->prepare("SELECT id, nome, created_at FROM subcategorias WHERE categoria_id = ? ORDER BY created_at ASC");
             $stmtSub->execute([$cat['id']]);
             $subcategorias = $stmtSub->fetchAll();
             
             foreach ($subcategorias as &$sub) {
-                // ALTERADO: Ordenar produtos por data de criação (mais antigos primeiro)
                 $stmtProd = $pdo->prepare("SELECT id, nome, tipo_preco, preco_fixo, created_at FROM produtos WHERE subcategoria_id = ? ORDER BY created_at ASC");
                 $stmtProd->execute([$sub['id']]);
                 $sub['produtos'] = $stmtProd->fetchAll();

@@ -14,7 +14,6 @@ let selecionados = {
 
 // ===== PRELOADER =====
 document.addEventListener('DOMContentLoaded', function() {
-    // Criar e adicionar o preloader premium
     const preloader = document.createElement('div');
     preloader.className = 'preloader';
     preloader.innerHTML = `
@@ -35,7 +34,6 @@ document.addEventListener('DOMContentLoaded', function() {
     `;
     document.body.prepend(preloader);
 
-    // Remover preloader após carregamento
     window.addEventListener('load', function() {
         setTimeout(function() {
             preloader.classList.add('hidden');
@@ -45,10 +43,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 1000);
     });
 
-    // Inicializar
     carregarEstruturaAdmin();
 
-    // Header scroll effect
     const header = document.querySelector('header');
     window.addEventListener('scroll', function() {
         if (window.scrollY > 10) {
@@ -70,6 +66,14 @@ function escapeHtml(text) {
 function fecharModais() {
     document.querySelectorAll('.modal').forEach(m => m.classList.remove('open'));
     contextoAtual = null;
+}
+
+// Fecha apenas os modais de gestão de fatores (mantém o do produto aberto)
+function fecharModaisFatores() {
+    const modalGerir = document.getElementById('modal-gerir-fatores');
+    const modalFator = document.getElementById('modal-fator');
+    if (modalGerir) modalGerir.classList.remove('open');
+    if (modalFator) modalFator.classList.remove('open');
 }
 
 function getPlaceholderSVG() {
@@ -608,6 +612,7 @@ async function guardarProduto(e) {
             let precoInput = tr.querySelector('.preco-variante-input');
             let precoVal = precoInput ? precoInput.value : '';
             
+            // Só guarda se o preço estiver preenchido
             if (precoVal && precoVal !== '') {
                 let atributos = {};
                 nomesFatores.forEach((nome, i) => {
@@ -787,7 +792,9 @@ function abrirModalEditarProduto(prodStringEncoded) {
 }
 
 // ===== GERIR FATORES =====
+
 async function abrirGerirFatores() {
+    contextoAtual = null;
     await carregarListaFatores();
     document.getElementById('modal-gerir-fatores').classList.add('open');
 }
@@ -831,6 +838,216 @@ async function carregarListaFatores() {
             `}).join('')}
         </div>
     `;
+}
+
+function abrirModalCriarFator() {
+    document.getElementById('form-fator').reset();
+    document.getElementById('fator-id').value = '';
+    document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
+    document.getElementById('entidade-select-group').style.display = 'none';
+
+    const subcatId = document.getElementById('prod-subcat-id').value;
+    const produtoId = document.getElementById('prod-id').value;
+
+    if (produtoId && produtoId !== '' && produtoId !== 'undefined' && produtoId !== 'null') {
+        document.getElementById('fator-escopo').value = 'produto';
+        contextoAtual = { tipo: 'produto', id: produtoId };
+    } else if (subcatId && subcatId !== '' && subcatId !== 'undefined' && subcatId !== 'null') {
+        document.getElementById('fator-escopo').value = 'produto_pendente';
+        contextoAtual = { tipo: 'produto_pendente', id: null };
+    } else {
+        document.getElementById('fator-escopo').value = 'global';
+        contextoAtual = null;
+    }
+
+    document.getElementById('modal-fator').classList.add('open');
+}
+
+async function abrirModalEditarFator(id) {
+    fetch('api/api.php?acao=listar_todos_fatores')
+        .then(res => res.json())
+        .then(fatores => {
+            const fator = fatores.find(f => f.id == id);
+            if (!fator) return;
+            
+            document.getElementById('form-fator').reset();
+            document.getElementById('fator-id').value = fator.id;
+            document.getElementById('fator-nome').value = fator.nome;
+            document.getElementById('fator-escopo').value = fator.escopo;
+            document.getElementById('modal-fator-titulo').innerText = 'Editar Fator';
+            
+            document.getElementById('entidade-select-group').style.display = 'none';
+            
+            if (fator.escopo === 'produto' && fator.entidade_id) {
+                contextoAtual = { tipo: 'produto', id: fator.entidade_id };
+            } else if (fator.escopo === 'subcategoria' && fator.entidade_id) {
+                contextoAtual = { tipo: 'subcategoria', id: fator.entidade_id };
+            } else if (fator.escopo === 'categoria' && fator.entidade_id) {
+                contextoAtual = { tipo: 'categoria', id: fator.entidade_id };
+            } else if (fator.escopo === 'produto_pendente') {
+                contextoAtual = { tipo: 'produto_pendente', id: null };
+            } else {
+                contextoAtual = null;
+            }
+            
+            document.getElementById('modal-fator').classList.add('open');
+        });
+}
+
+function mudarEscopoFator() {
+    const escopo = document.getElementById('fator-escopo').value;
+    document.getElementById('entidade-select-group').style.display = 'none';
+    
+    const subcatId = document.getElementById('prod-subcat-id').value;
+    const produtoId = document.getElementById('prod-id').value;
+    
+    if (escopo === 'produto') {
+        if (produtoId && produtoId !== '' && produtoId !== 'undefined' && produtoId !== 'null') {
+            contextoAtual = { tipo: 'produto', id: produtoId };
+        } else if (contextoAtual && contextoAtual.tipo === 'produto') {
+            // manter
+        } else {
+            contextoAtual = { tipo: 'produto_pendente', id: null };
+        }
+    } else if (escopo === 'subcategoria') {
+        if (subcatId && subcatId !== '' && subcatId !== 'undefined' && subcatId !== 'null') {
+            contextoAtual = { tipo: 'subcategoria', id: subcatId };
+        } else {
+            contextoAtual = null;
+        }
+    } else if (escopo === 'categoria') {
+        if (subcatId && subcatId !== '' && subcatId !== 'undefined' && subcatId !== 'null') {
+            fetch('api/api.php?acao=listar_estrutura')
+                .then(res => res.json())
+                .then(estrutura => {
+                    for (let cat of estrutura) {
+                        if (cat.subcategorias && cat.subcategorias.some(s => s.id == subcatId)) {
+                            contextoAtual = { tipo: 'categoria', id: cat.id };
+                            break;
+                        }
+                    }
+                })
+                .catch(() => { contextoAtual = null; });
+        } else {
+            contextoAtual = null;
+        }
+    } else {
+        contextoAtual = null;
+    }
+}
+
+async function guardarFator(e) {
+    e.preventDefault();
+    
+    const nome = document.getElementById('fator-nome').value;
+    let escopo = document.getElementById('fator-escopo').value;
+    let entidade_id = null;
+    
+    if (escopo === 'produto') {
+        const produtoId = document.getElementById('prod-id').value;
+        if (produtoId && produtoId !== '' && produtoId !== 'undefined' && produtoId !== 'null') {
+            entidade_id = produtoId;
+        } else if (contextoAtual && contextoAtual.tipo === 'produto') {
+            entidade_id = contextoAtual.id;
+        } else {
+            escopo = 'produto_pendente';
+            entidade_id = null;
+        }
+    } else if (escopo === 'produto_pendente') {
+        entidade_id = null;
+    } else if (escopo === 'global') {
+        entidade_id = null;
+    } else if (escopo === 'subcategoria') {
+        const subcatId = document.getElementById('prod-subcat-id').value;
+        if (subcatId && subcatId !== '' && subcatId !== 'undefined' && subcatId !== 'null') {
+            entidade_id = subcatId;
+        } else if (contextoAtual && contextoAtual.tipo === 'subcategoria') {
+            entidade_id = contextoAtual.id;
+        } else {
+            alert('Não foi possível determinar a subcategoria. Selecione uma subcategoria primeiro.');
+            return;
+        }
+    } else if (escopo === 'categoria') {
+        const subcatId = document.getElementById('prod-subcat-id').value;
+        if (subcatId && subcatId !== '' && subcatId !== 'undefined' && subcatId !== 'null') {
+            try {
+                const res = await fetch('api/api.php?acao=listar_estrutura');
+                const estrutura = await res.json();
+                for (let cat of estrutura) {
+                    if (cat.subcategorias) {
+                        for (let sub of cat.subcategorias) {
+                            if (sub.id == subcatId) {
+                                entidade_id = cat.id;
+                                break;
+                            }
+                        }
+                    }
+                    if (entidade_id) break;
+                }
+                if (!entidade_id) {
+                    alert('Não foi possível determinar a categoria.');
+                    return;
+                }
+            } catch (error) {
+                alert('Erro ao buscar a categoria.');
+                return;
+            }
+        } else if (contextoAtual && contextoAtual.tipo === 'categoria') {
+            entidade_id = contextoAtual.id;
+        } else {
+            alert('Não foi possível determinar a categoria.');
+            return;
+        }
+    }
+    
+    const fator = {
+        id: document.getElementById('fator-id').value || null,
+        nome: nome,
+        tipo: 'select',
+        escopo: escopo,
+        entidade_id: entidade_id,
+        opcoes: [],
+        obrigatorio: false,
+        ordem: 0
+    };
+    
+    const res = await fetch('api/api.php?acao=guardar_fator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fator)
+    });
+    
+    const result = await res.json();
+    if (result.sucesso) {
+        // Fechar apenas modais de fatores (mantém o do produto)
+        fecharModaisFatores();
+        await carregarListaFatores();
+        
+        const subcatId = document.getElementById('prod-subcat-id').value;
+        const produtoId = document.getElementById('prod-id').value;
+        if (subcatId) {
+            await carregarFatoresDisponiveis(subcatId, produtoId || null);
+        }
+        
+        contextoAtual = null;
+    } else {
+        alert('Erro ao guardar fator: ' + (result.erro || 'Tente novamente.'));
+    }
+}
+
+async function eliminarFator(id) {
+    if(confirm("Eliminar este fator?")) {
+        const fd = new FormData();
+        fd.append('id', id);
+        await fetch('api/api.php?acao=eliminar_fator', { method: 'POST', body: fd });
+        await carregarListaFatores();
+        
+        const subcatId = document.getElementById('prod-subcat-id').value;
+        const produtoId = document.getElementById('prod-id').value;
+        if (subcatId) {
+            await carregarFatoresDisponiveis(subcatId, produtoId || null);
+        }
+    }
 }
 
 // ===== ATUALIZAR PREÇOS =====
@@ -1171,177 +1388,5 @@ async function aplicarAumentoPrecos() {
     } catch (error) {
         console.error('Erro:', error);
         alert('Erro ao comunicar com o servidor.');
-    }
-}
-
-// ===== FUNÇÕES ADICIONAIS =====
-function abrirModalCriarFator() {
-    document.getElementById('form-fator').reset();
-    document.getElementById('fator-id').value = '';
-    document.getElementById('modal-fator-titulo').innerText = 'Novo Fator';
-    document.getElementById('entidade-select-group').style.display = 'none';
-    document.getElementById('fator-escopo').value = 'global';
-    document.getElementById('modal-fator').classList.add('open');
-}
-
-function abrirModalEditarFator(id) {
-    fetch('api/api.php?acao=listar_todos_fatores')
-        .then(res => res.json())
-        .then(fatores => {
-            const fator = fatores.find(f => f.id == id);
-            if (!fator) return;
-            
-            document.getElementById('form-fator').reset();
-            document.getElementById('fator-id').value = fator.id;
-            document.getElementById('fator-nome').value = fator.nome;
-            document.getElementById('fator-escopo').value = fator.escopo;
-            document.getElementById('modal-fator-titulo').innerText = 'Editar Fator';
-            
-            if (fator.escopo !== 'global' && fator.entidade_id) {
-                carregarEntidadeSelect(fator.escopo, fator.entidade_id);
-                document.getElementById('entidade-select-group').style.display = 'block';
-            } else {
-                document.getElementById('entidade-select-group').style.display = 'none';
-            }
-            
-            document.getElementById('modal-fator').classList.add('open');
-        });
-}
-
-function mudarEscopoFator() {
-    const escopo = document.getElementById('fator-escopo').value;
-    const entidadeGroup = document.getElementById('entidade-select-group');
-    
-    if (escopo === 'global') {
-        entidadeGroup.style.display = 'none';
-        return;
-    }
-    
-    entidadeGroup.style.display = 'block';
-    carregarEntidadeOptions(escopo);
-}
-
-function carregarEntidadeOptions(escopo) {
-    const entidadeSelect = document.getElementById('fator-entidade-id');
-    const entidadeLabel = document.getElementById('entidade-label');
-    
-    if (escopo === 'categoria') {
-        entidadeLabel.innerText = 'Selecionar Categoria:';
-        fetch('api/api.php?acao=listar_categorias_simples')
-            .then(res => res.json())
-            .then(categorias => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
-            });
-    } else if (escopo === 'subcategoria') {
-        entidadeLabel.innerText = 'Selecionar Subcategoria:';
-        fetch('api/api.php?acao=listar_subcategorias_simples')
-            .then(res => res.json())
-            .then(subcategorias => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    subcategorias.map(s => `<option value="${s.id}">${escapeHtml(s.categoria_nome)} > ${escapeHtml(s.nome)}</option>`).join('');
-            });
-    } else if (escopo === 'produto') {
-        entidadeLabel.innerText = 'Selecionar Produto:';
-        fetch('api/api.php?acao=listar_produtos_simples')
-            .then(res => res.json())
-            .then(produtos => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    produtos.map(p => `<option value="${p.id}">${escapeHtml(p.categoria_nome)} > ${escapeHtml(p.subcategoria_nome)} > ${escapeHtml(p.nome)}</option>`).join('');
-            });
-    }
-}
-
-function carregarEntidadeSelect(escopo, entidadeId) {
-    const entidadeSelect = document.getElementById('fator-entidade-id');
-    const entidadeLabel = document.getElementById('entidade-label');
-    
-    if (escopo === 'categoria') {
-        entidadeLabel.innerText = 'Selecionar Categoria:';
-        fetch('api/api.php?acao=listar_categorias_simples')
-            .then(res => res.json())
-            .then(categorias => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    categorias.map(c => `<option value="${c.id}">${escapeHtml(c.nome)}</option>`).join('');
-                entidadeSelect.value = entidadeId;
-            });
-    } else if (escopo === 'subcategoria') {
-        entidadeLabel.innerText = 'Selecionar Subcategoria:';
-        fetch('api/api.php?acao=listar_subcategorias_simples')
-            .then(res => res.json())
-            .then(subcategorias => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    subcategorias.map(s => `<option value="${s.id}">${escapeHtml(s.categoria_nome)} > ${escapeHtml(s.nome)}</option>`).join('');
-                entidadeSelect.value = entidadeId;
-            });
-    } else if (escopo === 'produto') {
-        entidadeLabel.innerText = 'Selecionar Produto:';
-        fetch('api/api.php?acao=listar_produtos_simples')
-            .then(res => res.json())
-            .then(produtos => {
-                entidadeSelect.innerHTML = '<option value="">Selecione...</option>' + 
-                    produtos.map(p => `<option value="${p.id}">${escapeHtml(p.categoria_nome)} > ${escapeHtml(p.subcategoria_nome)} > ${escapeHtml(p.nome)}</option>`).join('');
-                entidadeSelect.value = entidadeId;
-            });
-    }
-}
-
-async function guardarFator(e) {
-    e.preventDefault();
-    
-    const nome = document.getElementById('fator-nome').value;
-    let escopo = document.getElementById('fator-escopo').value;
-    let entidade_id = null;
-    
-    if (escopo !== 'global') {
-        entidade_id = document.getElementById('fator-entidade-id').value;
-        if (!entidade_id) {
-            alert('Por favor, selecione uma entidade.');
-            return;
-        }
-    }
-    
-    const fator = {
-        id: document.getElementById('fator-id').value || null,
-        nome: nome,
-        tipo: 'select',
-        escopo: escopo,
-        entidade_id: entidade_id,
-        opcoes: [],
-        obrigatorio: false,
-        ordem: 0
-    };
-    
-    const res = await fetch('api/api.php?acao=guardar_fator', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fator)
-    });
-    
-    const result = await res.json();
-    if (result.sucesso) {
-        fecharModais();
-        await carregarListaFatores();
-        
-        const subcatId = document.getElementById('prod-subcat-id').value;
-        const produtoId = document.getElementById('prod-id').value;
-        if (subcatId) {
-            await carregarFatoresDisponiveis(subcatId, produtoId || null);
-        }
-    }
-}
-
-async function eliminarFator(id) {
-    if(confirm("Eliminar este fator?")) {
-        const fd = new FormData();
-        fd.append('id', id);
-        await fetch('api/api.php?acao=eliminar_fator', { method: 'POST', body: fd });
-        await carregarListaFatores();
-        
-        const subcatId = document.getElementById('prod-subcat-id').value;
-        const produtoId = document.getElementById('prod-id').value;
-        if (subcatId) {
-            await carregarFatoresDisponiveis(subcatId, produtoId || null);
-        }
     }
 }
